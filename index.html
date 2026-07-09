@@ -5580,10 +5580,11 @@ const REAL_HANDLERS = {
     const pages = doc.getPages();
     const lastPage = pages[pages.length - 1];
     const { width, height } = lastPage.getSize();
+    const font = await doc.embedFont(P.StandardFonts.Helvetica);
     recipients.forEach((email, i) => {
       const y = height - 80 - i * 60;
       lastPage.drawRectangle({ x: 60, y: y - 5, width: 200, height: 30, borderColor: P.rgb(0.2, 0.45, 0.88), borderWidth: 1 });
-      lastPage.drawText("Signature: " + email.slice(0, 30), { x: 65, y: y + 5, size: 9, font: await doc.embedFont(P.StandardFonts.Helvetica), color: P.rgb(0.4, 0.4, 0.4) });
+      lastPage.drawText("Signature: " + email.slice(0, 30), { x: 65, y: y + 5, size: 9, font, color: P.rgb(0.4, 0.4, 0.4) });
     });
     prog(85, "Saving");
     return { blob: pdfBlobFrom(await doc.save()), rows: [["Signers", String(recipients.length)]] };
