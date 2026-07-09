@@ -5273,25 +5273,54 @@ const REAL_HANDLERS = {
     const pdfDoc = await lib.getDocument({ data: await state.files[0].file.arrayBuffer() }).promise;
     let allText = "";
     for (let p = 1; p <= Math.min(pdfDoc.numPages, 100); p++) {
-      prog(20 + Math.round(50 * p / pdfDoc.numPages), "Reading page " + p + " of " + pdfDoc.numPages);
+      prog(20 + Math.round(30 * p / pdfDoc.numPages), "Reading page " + p + " of " + pdfDoc.numPages);
       const page = await pdfDoc.getPage(p);
       const tc = await page.getTextContent();
       allText += "\n\n--- Page " + p + " ---\n\n" + tc.items.map(it => it.str).join(" ");
     }
     
-    // If no text extracted, convert pages to images
+    // If no text extracted, use OCR to extract text from images
     if (allText.trim().length < 50) {
-      prog(70, "No text found, converting to images...");
-      const images = [];
-      for (let p = 1; p <= pdfDoc.numPages; p++) {
-        prog(70 + Math.round(20 * p / pdfDoc.numPages), "Rendering page " + p);
-        const u8 = await renderPdfPageJpeg(pdfDoc, p, 2, 0.9);
-        images.push(u8);
+      prog(50, "No text found, running OCR...");
+      
+      // Load Tesseract.js
+      let Tesseract;
+      try {
+        Tesseract = await import("https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js");
+      } catch (e) {
+        throw new Error("Could not load OCR engine. Check your internet connection.");
       }
+      
+      const worker = await Tesseract.createWorker("eng");
+      let ocrText = "";
+      
+      for (let p = 1; p <= pdfDoc.numPages; p++) {
+        prog(50 + Math.round(40 * p / pdfDoc.numPages), "OCR page " + p + " of " + pdfDoc.numPages);
+        
+        // Render page to canvas
+        const page = await pdfDoc.getPage(p);
+        const viewport = page.getViewport({ scale: 2 });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const context = canvas.getContext("2d");
+        
+        await page.render({
+          canvasContext: context,
+          viewport: viewport
+        }).promise;
+        
+        // OCR the canvas
+        const { data: { text } } = await worker.recognize(canvas);
+        ocrText += "\n\n--- Page " + p + " ---\n\n" + text;
+      }
+      
+      await worker.terminate();
       pdfDoc.destroy();
-      prog(90, "Creating Word document with images");
-      const blob = await createDocxFromImages(images);
-      return { blob, name: baseName(state.files[0].name) + ".docx", rows: [["Pages as images", String(images.length)]] };
+      
+      prog(90, "Creating Word document");
+      const blob = await createDocx(ocrText.trim());
+      return { blob, name: baseName(state.files[0].name) + ".docx", rows: [["OCR processed", String(pdfDoc.numPages) + " pages"]] };
     }
     
     pdfDoc.destroy();
