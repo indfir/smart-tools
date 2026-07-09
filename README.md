@@ -18,6 +18,10 @@ Smart Tools is a comprehensive, privacy-first document utility that brings **40+
 
 Built as a single-file HTML application with an optional PHP proxy for AI features, it can be deployed to any static hosting provider with zero build steps.
 
+## Live Demo
+
+**Try it now:** [https://smarttools.indfir.com](https://smarttools.indfir.com)
+
 ## Features
 
 ### Privacy First
@@ -159,7 +163,6 @@ smart-tools/
 ├── index.html        # Complete web application (HTML + CSS + JS, ~5400 lines)
 ├── ai-proxy.php      # Server-side proxy for AI provider API calls
 ├── .gitignore        # Git ignore rules
-├── CARA-UPLOAD.txt   # Deployment guide (Indonesian)
 └── README.md         # This file
 ```
 
@@ -243,6 +246,6 @@ This project is provided as-is for personal and commercial use.
 
 **Built with care for privacy-first document processing.**
 
-[GitHub](https://github.com/indfir/smart-tools) · [Report Issues](https://github.com/indfir/smart-tools/issues)
+[Live Demo](https://smarttools.indfir.com) · [GitHub](https://github.com/indfir/smart-tools) · [Report Issues](https://github.com/indfir/smart-tools/issues)
 
 </div>
