@@ -4342,6 +4342,83 @@ function createDocx(text) {
   return zipBlob(files);
 }
 
+async function createDocxFromImages(images) {
+  const enc = new TextEncoder();
+  
+  // Build document.xml with embedded images
+  let bodyXml = "";
+  images.forEach((imgData, i) => {
+    const imgId = "rId" + (i + 2); // rId1 is for styles
+    // A4 page width in EMUs: 595.28pt * 9525 = 5670042 EMU
+    // Page height: 841.89pt * 9525 = 8018992 EMU
+    // Image width: ~5400000 EMU (with margins)
+    // Image height: proportional (A4 aspect ratio ~1.414)
+    const imgWidth = 5400000;
+    const imgHeight = Math.round(imgWidth * 1.414);
+    
+    bodyXml += '<w:p><w:pPr><w:jc w:val="center"/></w:pPr>';
+    bodyXml += '<w:r><w:rPr/><w:drawing>';
+    bodyXml += '<wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">';
+    bodyXml += '<wp:extent cx="' + imgWidth + '" cy="' + imgHeight + '"/>';
+    bodyXml += '<wp:docPr id="' + (i + 1) + '" name="Page ' + (i + 1) + '"/>';
+    bodyXml += '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">';
+    bodyXml += '<a:graphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></a:graphicFramePr>';
+    bodyXml += '<a:xfrm><a:off x="0" y="0"/><a:ext cx="' + imgWidth + '" cy="' + imgHeight + '"/></a:xfrm>';
+    bodyXml += '<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">';
+    bodyXml += '<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">';
+    bodyXml += '<pic:nvPicPr><pic:cNvPr id="' + (i + 1) + '" name="image' + (i + 1) + '.jpeg"/><pic:cNvPicPr/></pic:nvPicPr>';
+    bodyXml += '<pic:blipFill><a:blip r:embed="' + imgId + '" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>';
+    bodyXml += '<a:stretch><a:fillRect/></a:stretch></pic:blipFill>';
+    bodyXml += '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + imgWidth + '" cy="' + imgHeight + '"/></a:xfrm></pic:spPr>';
+    bodyXml += '</pic:pic></a:graphicData></a:graphic></wp:inline>';
+    bodyXml += '</w:drawing></w:r></w:p>';
+  });
+  
+  // Build relationships for images
+  let relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  relsXml += '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+  relsXml += '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>';
+  relsXml += '</Relationships>';
+  
+  let docRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  docRelsXml += '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+  images.forEach((_, i) => {
+    const imgId = "rId" + (i + 2);
+    docRelsXml += '<Relationship Id="' + imgId + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image' + (i + 1) + '.jpeg"/>';
+  });
+  docRelsXml += '</Relationships>';
+  
+  // Build content types
+  let contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  contentTypesXml += '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">';
+  contentTypesXml += '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>';
+  contentTypesXml += '<Default Extension="xml" ContentType="application/xml"/>';
+  contentTypesXml += '<Default Extension="jpeg" ContentType="image/jpeg"/>';
+  contentTypesXml += '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>';
+  contentTypesXml += '</Types>';
+  
+  // Build document.xml
+  const docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+    '<w:body>' + bodyXml + '</w:body></w:document>';
+  
+  // Prepare files for ZIP
+  const files = [
+    { name: "[Content_Types].xml", data: enc.encode(contentTypesXml) },
+    { name: "_rels/.rels", data: enc.encode(relsXml) },
+    { name: "word/document.xml", data: enc.encode(docXml) },
+    { name: "word/_rels/document.xml.rels", data: enc.encode(docRelsXml) },
+  ];
+  
+  // Add image files
+  images.forEach((imgData, i) => {
+    files.push({ name: "word/media/image" + (i + 1) + ".jpeg", data: imgData });
+  });
+  
+  return zipBlob(files);
+}
+
 function createXlsx(text) {
   const enc = new TextEncoder();
   const rows = text.split("\n").filter(r => r.trim());
@@ -5201,6 +5278,22 @@ const REAL_HANDLERS = {
       const tc = await page.getTextContent();
       allText += "\n\n--- Page " + p + " ---\n\n" + tc.items.map(it => it.str).join(" ");
     }
+    
+    // If no text extracted, convert pages to images
+    if (allText.trim().length < 50) {
+      prog(70, "No text found, converting to images...");
+      const images = [];
+      for (let p = 1; p <= pdfDoc.numPages; p++) {
+        prog(70 + Math.round(20 * p / pdfDoc.numPages), "Rendering page " + p);
+        const u8 = await renderPdfPageJpeg(pdfDoc, p, 2, 0.9);
+        images.push(u8);
+      }
+      pdfDoc.destroy();
+      prog(90, "Creating Word document with images");
+      const blob = await createDocxFromImages(images);
+      return { blob, name: baseName(state.files[0].name) + ".docx", rows: [["Pages as images", String(images.length)]] };
+    }
+    
     pdfDoc.destroy();
     prog(80, "Creating Word document");
     const blob = await createDocx(allText.trim());
