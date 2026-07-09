@@ -22,7 +22,7 @@ Built as a single-file HTML application with an optional PHP proxy for AI featur
 
 **Use it now:** [https://smarttools.indfir.com](https://smarttools.indfir.com)
 
-> **Note:** Tools marked with a yellow "DEMO" badge on the website are still in development and produce simulated output. Tools without the badge are fully functional and process real files.
+All 40+ tools are fully functional and process real files directly in your browser.
 
 ## Features
 
@@ -42,7 +42,7 @@ Built as a single-file HTML application with an optional PHP proxy for AI featur
 #### Convert
 | Tool | Description | Status |
 |------|-------------|--------|
-| **PDF Converter** | Universal converter — transform files to and from PDF in one place | 🚧 In Development |
+| **PDF Converter** | Universal converter — transform files to and from PDF in one place | ✅ Working |
 
 #### AI PDF (powered by your API key)
 | Tool | Description | Status |
@@ -66,43 +66,43 @@ Built as a single-file HTML application with an optional PHP proxy for AI featur
 #### View & Edit
 | Tool | Description | Status |
 |------|-------------|--------|
-| **Edit PDF** | Add text, highlights, drawings, and shapes | 🚧 In Development |
-| **PDF Annotator** | Highlight, underline, comment, and draw on PDFs | 🚧 In Development |
+| **Edit PDF** | Add text, highlights, drawings, and shapes | ✅ Working |
+| **PDF Annotator** | Highlight, underline, comment, and draw on PDFs | ✅ Working |
 | **PDF Reader** | Full-featured in-browser PDF viewer with page navigation and zoom | ✅ Working |
 | **Number Pages** | Add page numbers with customizable position, size, and range | ✅ Working |
 | **Crop PDF** | Trim page margins with precise mm-level control | ✅ Working |
-| **Redact PDF** | Permanently black out sensitive text or areas | 🚧 In Development |
+| **Redact PDF** | Permanently black out sensitive text or areas | ✅ Working |
 | **Watermark PDF** | Stamp text or image watermarks with opacity, rotation, and position control | ✅ Working |
 | **PDF Form Filler** | Detect and fill form fields inside PDFs | ✅ Working |
-| **Share PDF** | Generate shareable links for uploaded documents | 🚧 In Development |
+| **Share PDF** | Prepare a PDF for sharing with others | ✅ Working |
 
 #### Convert from PDF
 | Tool | Description | Status |
 |------|-------------|--------|
-| **PDF to Word** | Convert PDF to editable .docx with layout preservation and OCR | 🚧 In Development |
-| **PDF to Excel** | Extract tables into .xlsx spreadsheets | 🚧 In Development |
-| **PDF to PPT** | Transform pages into PowerPoint slides | 🚧 In Development |
+| **PDF to Word** | Convert PDF to editable .docx with text extraction | ✅ Working |
+| **PDF to Excel** | Extract content into .xlsx spreadsheets | ✅ Working |
+| **PDF to PPT** | Transform pages into PowerPoint slides | ✅ Working |
 | **PDF to JPG** | Export pages as high-quality images (72/150/300 DPI) | ✅ Working |
 
 #### Convert to PDF
 | Tool | Source Format | Status |
 |------|---------------|--------|
-| **Word to PDF** | .doc, .docx | 🚧 In Development |
-| **Excel to PDF** | .xls, .xlsx (single or all sheets) | 🚧 In Development |
-| **PPT to PDF** | .ppt, .pptx (with optional speaker notes) | 🚧 In Development |
+| **Word to PDF** | .doc, .docx | ✅ Working |
+| **Excel to PDF** | .xls, .xlsx (single or all sheets) | ✅ Working |
+| **PPT to PDF** | .ppt, .pptx (with optional speaker notes) | ✅ Working |
 | **JPG to PDF** | .jpg, .jpeg, .png (multiple images, reorderable) | ✅ Working |
-| **PDF OCR** | Scanned PDFs and images → searchable PDF | 🚧 In Development |
-| **HTML to PDF** | Web pages or raw HTML → PDF | 🚧 In Development |
+| **PDF OCR** | Scanned PDFs and images → searchable PDF (Tesseract.js) | ✅ Working |
+| **HTML to PDF** | Web pages or raw HTML → PDF | ✅ Working |
 | **TXT to PDF** | Plain text files or pasted text → PDF | ✅ Working |
-| **RTF to PDF** | Rich text files → PDF | 🚧 In Development |
-| **ODT to PDF** | OpenDocument text files → PDF | 🚧 In Development |
-| **EPUB to PDF** | E-books → printable PDF with cover page | 🚧 In Development |
+| **RTF to PDF** | Rich text files → PDF | ✅ Working |
+| **ODT to PDF** | OpenDocument text files → PDF | ✅ Working |
+| **EPUB to PDF** | E-books → printable PDF with cover page | ✅ Working |
 
 #### Sign
 | Tool | Description | Status |
 |------|-------------|--------|
 | **Sign PDF** | Draw, type, or upload a signature and place it on your PDF | ✅ Working |
-| **Request Signatures** | Send documents for others to sign via email | 🚧 In Development |
+| **Request Signatures** | Prepare a document with signature fields for others to sign | ✅ Working |
 
 #### Print Tools
 | Tool | Description | Status |
@@ -132,8 +132,8 @@ Built as a single-file HTML application with an optional PHP proxy for AI featur
 #### More
 | Tool | Description | Status |
 |------|-------------|--------|
-| **Unlock PDF** | Remove password protection from PDFs you own | 🚧 In Development |
-| **Protect PDF** | Add password encryption with print/copy/edit restrictions | 🚧 In Development |
+| **Unlock PDF** | Remove password protection from PDFs you own | ✅ Working |
+| **Protect PDF** | Add password protection and metadata to a PDF | ✅ Working |
 | **Flatten PDF** | Merge form fields and annotations into page content | ✅ Working |
 
 ### UI/UX
@@ -151,7 +151,8 @@ Built as a single-file HTML application with an optional PHP proxy for AI featur
 |-------|-----------|
 | **Frontend** | Vanilla HTML, CSS, JavaScript (single-file, no build step) |
 | **PDF Rendering** | [pdf.js](https://mozilla.github.io/pdf.js/) 3.11 (lazy-loaded from CDN) |
-| **PDF Manipulation** | Client-side PDF generation and page manipulation |
+| **PDF Manipulation** | [pdf-lib](https://pdf-lib.js.org/) 1.17 (client-side PDF generation and editing) |
+| **OCR** | [Tesseract.js](https://tesseract.projectnaptha.com/) 5 (on-device text recognition) |
 | **Image Processing** | Canvas API, Web APIs |
 | **AI Background Removal** | ONNX model (~25 MB, runs in-browser via WebAssembly) |
 | **AI Proxy** | PHP cURL proxy with allowlisted upstream providers |
