@@ -18,9 +18,11 @@ Smart Tools is a comprehensive, privacy-first document utility that brings **40+
 
 Built as a single-file HTML application with an optional PHP proxy for AI features, it can be deployed to any static hosting provider with zero build steps.
 
-## Live Demo
+## Live App
 
-**Try it now:** [https://smarttools.indfir.com](https://smarttools.indfir.com)
+**Use it now:** [https://smarttools.indfir.com](https://smarttools.indfir.com)
+
+> **Note:** Tools marked with a yellow "DEMO" badge on the website are still in development and produce simulated output. Tools without the badge are fully functional and process real files.
 
 ## Features
 
@@ -33,106 +35,106 @@ Built as a single-file HTML application with an optional PHP proxy for AI featur
 ### 40+ Tools Across 12 Categories
 
 #### Compress
-| Tool | Description |
-|------|-------------|
-| **Compress PDF** | Reduce PDF file size while maintaining document quality with adjustable compression levels |
+| Tool | Description | Status |
+|------|-------------|--------|
+| **Compress PDF** | Reduce PDF file size while maintaining document quality with adjustable compression levels | ✅ Working |
 
 #### Convert
-| Tool | Description |
-|------|-------------|
-| **PDF Converter** | Universal converter — transform files to and from PDF in one place |
+| Tool | Description | Status |
+|------|-------------|--------|
+| **PDF Converter** | Universal converter — transform files to and from PDF in one place | 🚧 In Development |
 
 #### AI PDF (powered by your API key)
-| Tool | Description |
-|------|-------------|
-| **AI PDF Assistant** | Ask questions and get instant answers from your document |
-| **Chat with PDF** | Have a natural conversation with your document's contents |
-| **AI PDF Summarizer** | Generate concise summaries with short, medium, or detailed length options |
-| **Translate PDF** | Translate documents into 7+ languages with layout preservation |
-| **AI Question Generator** | Auto-generate multiple choice, true/false, or open-ended quiz questions |
+| Tool | Description | Status |
+|------|-------------|--------|
+| **AI PDF Assistant** | Ask questions and get instant answers from your document | ✅ Working |
+| **Chat with PDF** | Have a natural conversation with your document's contents | ✅ Working |
+| **AI PDF Summarizer** | Generate concise summaries with short, medium, or detailed length options | ✅ Working |
+| **Translate PDF** | Translate documents into 7+ languages with layout preservation | ✅ Working |
+| **AI Question Generator** | Auto-generate multiple choice, true/false, or open-ended quiz questions | ✅ Working |
 
 #### Organize
-| Tool | Description |
-|------|-------------|
-| **Merge PDF** | Combine PDF, image, Word, Excel, and PowerPoint files into a single PDF |
-| **Split PDF** | Split by page range, extract specific pages, or split every N pages |
-| **Rotate PDF** | Rotate all or selected pages (90° CW/CCW, 180°) |
-| **Delete PDF Pages** | Remove specific pages from a PDF document |
-| **Extract PDF Pages** | Pull pages into a single PDF or separate files (ZIP) |
-| **Organize PDF** | Visual drag-and-drop page reordering and deletion |
+| Tool | Description | Status |
+|------|-------------|--------|
+| **Merge PDF** | Combine PDF, image, Word, Excel, and PowerPoint files into a single PDF | ✅ Working |
+| **Split PDF** | Split by page range, extract specific pages, or split every N pages | ✅ Working |
+| **Rotate PDF** | Rotate all or selected pages (90° CW/CCW, 180°) | ✅ Working |
+| **Delete PDF Pages** | Remove specific pages from a PDF document | ✅ Working |
+| **Extract PDF Pages** | Pull pages into a single PDF or separate files (ZIP) | ✅ Working |
+| **Organize PDF** | Visual drag-and-drop page reordering and deletion | ✅ Working |
 
 #### View & Edit
-| Tool | Description |
-|------|-------------|
-| **Edit PDF** | Add text, highlights, drawings, and shapes |
-| **PDF Annotator** | Highlight, underline, comment, and draw on PDFs |
-| **PDF Reader** | Full-featured in-browser PDF viewer with page navigation and zoom |
-| **Number Pages** | Add page numbers with customizable position, size, and range |
-| **Crop PDF** | Trim page margins with precise mm-level control |
-| **Redact PDF** | Permanently black out sensitive text or areas |
-| **Watermark PDF** | Stamp text or image watermarks with opacity, rotation, and position control |
-| **PDF Form Filler** | Detect and fill form fields inside PDFs |
-| **Share PDF** | Generate shareable links for uploaded documents |
+| Tool | Description | Status |
+|------|-------------|--------|
+| **Edit PDF** | Add text, highlights, drawings, and shapes | 🚧 In Development |
+| **PDF Annotator** | Highlight, underline, comment, and draw on PDFs | 🚧 In Development |
+| **PDF Reader** | Full-featured in-browser PDF viewer with page navigation and zoom | ✅ Working |
+| **Number Pages** | Add page numbers with customizable position, size, and range | ✅ Working |
+| **Crop PDF** | Trim page margins with precise mm-level control | ✅ Working |
+| **Redact PDF** | Permanently black out sensitive text or areas | 🚧 In Development |
+| **Watermark PDF** | Stamp text or image watermarks with opacity, rotation, and position control | ✅ Working |
+| **PDF Form Filler** | Detect and fill form fields inside PDFs | ✅ Working |
+| **Share PDF** | Generate shareable links for uploaded documents | 🚧 In Development |
 
 #### Convert from PDF
-| Tool | Description |
-|------|-------------|
-| **PDF to Word** | Convert PDF to editable .docx with layout preservation and OCR |
-| **PDF to Excel** | Extract tables into .xlsx spreadsheets |
-| **PDF to PPT** | Transform pages into PowerPoint slides |
-| **PDF to JPG** | Export pages as high-quality images (72/150/300 DPI) |
+| Tool | Description | Status |
+|------|-------------|--------|
+| **PDF to Word** | Convert PDF to editable .docx with layout preservation and OCR | 🚧 In Development |
+| **PDF to Excel** | Extract tables into .xlsx spreadsheets | 🚧 In Development |
+| **PDF to PPT** | Transform pages into PowerPoint slides | 🚧 In Development |
+| **PDF to JPG** | Export pages as high-quality images (72/150/300 DPI) | ✅ Working |
 
 #### Convert to PDF
-| Tool | Source Format |
-|------|---------------|
-| **Word to PDF** | .doc, .docx |
-| **Excel to PDF** | .xls, .xlsx (single or all sheets) |
-| **PPT to PDF** | .ppt, .pptx (with optional speaker notes) |
-| **JPG to PDF** | .jpg, .jpeg, .png (multiple images, reorderable) |
-| **PDF OCR** | Scanned PDFs and images → searchable PDF |
-| **HTML to PDF** | Web pages or raw HTML → PDF |
-| **TXT to PDF** | Plain text files or pasted text → PDF |
-| **RTF to PDF** | Rich text files → PDF |
-| **ODT to PDF** | OpenDocument text files → PDF |
-| **EPUB to PDF** | E-books → printable PDF with cover page |
+| Tool | Source Format | Status |
+|------|---------------|--------|
+| **Word to PDF** | .doc, .docx | 🚧 In Development |
+| **Excel to PDF** | .xls, .xlsx (single or all sheets) | 🚧 In Development |
+| **PPT to PDF** | .ppt, .pptx (with optional speaker notes) | 🚧 In Development |
+| **JPG to PDF** | .jpg, .jpeg, .png (multiple images, reorderable) | ✅ Working |
+| **PDF OCR** | Scanned PDFs and images → searchable PDF | 🚧 In Development |
+| **HTML to PDF** | Web pages or raw HTML → PDF | 🚧 In Development |
+| **TXT to PDF** | Plain text files or pasted text → PDF | ✅ Working |
+| **RTF to PDF** | Rich text files → PDF | 🚧 In Development |
+| **ODT to PDF** | OpenDocument text files → PDF | 🚧 In Development |
+| **EPUB to PDF** | E-books → printable PDF with cover page | 🚧 In Development |
 
 #### Sign
-| Tool | Description |
-|------|-------------|
-| **Sign PDF** | Draw, type, or upload a signature and place it on your PDF |
-| **Request Signatures** | Send documents for others to sign via email |
+| Tool | Description | Status |
+|------|-------------|--------|
+| **Sign PDF** | Draw, type, or upload a signature and place it on your PDF | ✅ Working |
+| **Request Signatures** | Send documents for others to sign via email | 🚧 In Development |
 
 #### Print Tools
-| Tool | Description |
-|------|-------------|
-| **Print ID Card** | Arrange KTP/ID cards into printable layouts with front-back duplex alignment, cut lines, and mm-precise positioning |
-| **Print Paper Layout** | Divide paper into 2/4/8/10/custom sections and fit content into each |
+| Tool | Description | Status |
+|------|-------------|--------|
+| **Print ID Card** | Arrange KTP/ID cards into printable layouts with front-back duplex alignment, cut lines, and mm-precise positioning | ✅ Working |
+| **Print Paper Layout** | Divide paper into 2/4/8/10/custom sections and fit content into each | ✅ Working |
 
 #### Image Tools
-| Tool | Description |
-|------|-------------|
-| **Crop Image** | Visual crop with free or preset ratios (including pas foto 2×3, 3×4, 4×6) |
-| **Resize Image** | Resize by exact pixels or percentage with aspect ratio lock |
-| **Compress Image** | Shrink file size with adjustable quality (JPG/PNG/WebP) |
-| **Convert Image** | Convert between JPG, PNG, and WebP with transparency handling |
-| **Remove Background** | AI-powered (on-device) or manual background removal to transparent PNG |
-| **Change Background** | Replace backgrounds with solid color, image, or blurred version |
-| **Image Editor** | Adjust brightness, contrast, saturation, grayscale, and blur with live preview |
-| **Image to PDF** | Turn images into printable PDFs with page size and fit control |
-| **Print Photo / ID Card** | Arrange pas foto or ID sizes on paper with duplex alignment |
-| **Batch Image Tools** | Compress, resize, convert, and rename up to 100 images at once → ZIP |
+| Tool | Description | Status |
+|------|-------------|--------|
+| **Crop Image** | Visual crop with free or preset ratios (including pas foto 2×3, 3×4, 4×6) | ✅ Working |
+| **Resize Image** | Resize by exact pixels or percentage with aspect ratio lock | ✅ Working |
+| **Compress Image** | Shrink file size with adjustable quality (JPG/PNG/WebP) | ✅ Working |
+| **Convert Image** | Convert between JPG, PNG, and WebP with transparency handling | ✅ Working |
+| **Remove Background** | AI-powered (on-device) or manual background removal to transparent PNG | ✅ Working |
+| **Change Background** | Replace backgrounds with solid color, image, or blurred version | ✅ Working |
+| **Image Editor** | Adjust brightness, contrast, saturation, grayscale, and blur with live preview | ✅ Working |
+| **Image to PDF** | Turn images into printable PDFs with page size and fit control | ✅ Working |
+| **Print Photo / ID Card** | Arrange pas foto or ID sizes on paper with duplex alignment | ✅ Working |
+| **Batch Image Tools** | Compress, resize, convert, and rename up to 100 images at once → ZIP | ✅ Working |
 
 #### Scan
-| Tool | Description |
-|------|-------------|
-| **PDF Scanner** | Turn photos of documents into clean scanned PDFs with auto-crop and contrast enhancement |
+| Tool | Description | Status |
+|------|-------------|--------|
+| **PDF Scanner** | Turn photos of documents into clean scanned PDFs with auto-crop and contrast enhancement | ✅ Working |
 
 #### More
-| Tool | Description |
-|------|-------------|
-| **Unlock PDF** | Remove password protection from PDFs you own |
-| **Protect PDF** | Add password encryption with print/copy/edit restrictions |
-| **Flatten PDF** | Merge form fields and annotations into page content |
+| Tool | Description | Status |
+|------|-------------|--------|
+| **Unlock PDF** | Remove password protection from PDFs you own | 🚧 In Development |
+| **Protect PDF** | Add password encryption with print/copy/edit restrictions | 🚧 In Development |
+| **Flatten PDF** | Merge form fields and annotations into page content | ✅ Working |
 
 ### UI/UX
 - **Dark & Light themes** with system preference detection
