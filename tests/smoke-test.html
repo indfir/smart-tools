@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Tools — QA Smoke Tests</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; background: #f8f9fa; color: #1a1a1a; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+  .subtitle { font-size: 13px; color: #666; margin-bottom: 24px; }
+  .controls { display: flex; gap: 12px; margin-bottom: 24px; align-items: center; }
+  .controls button { padding: 8px 16px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 500; }
+  .controls button:hover { background: #f0f0f0; }
+  .controls button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+  .controls button.primary:hover { background: #1d4ed8; }
+  .progress { height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden; margin-bottom: 24px; }
+  .progress-fill { height: 100%; background: #2563eb; transition: width 0.3s; width: 0%; }
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+  .summary-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; }
+  .summary-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #666; margin-bottom: 4px; }
+  .summary-card .value { font-size: 24px; font-weight: 700; }
+  .summary-card .value.pass { color: #16a34a; }
+  .summary-card .value.fail { color: #dc2626; }
+  .summary-card .value.skip { color: #d97706; }
+  .results { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+  .result-row { display: flex; align-items: center; padding: 10px 16px; border-bottom: 1px solid #f0f0f0; font-size: 13px; gap: 12px; }
+  .result-row:last-child { border-bottom: none; }
+  .result-row .status { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .result-row .status.pass { background: #dcfce7; color: #16a34a; }
+  .result-row .status.fail { background: #fee2e2; color: #dc2626; }
+  .result-row .status.skip { background: #fef3c7; color: #d97706; }
+  .result-row .status.running { background: #dbeafe; color: #2563eb; }
+  .result-row .name { flex: 1; font-weight: 500; }
+  .result-row .category { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.03em; }
+  .result-row .time { font-size: 11px; color: #999; font-variant-numeric: tabular-nums; }
+  .result-row .detail { font-size: 11px; color: #666; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .log { margin-top: 24px; background: #1a1a1a; color: #e5e7eb; border-radius: 8px; padding: 16px; font-family: "SF Mono", "Fira Code", monospace; font-size: 12px; line-height: 1.6; max-height: 400px; overflow-y: auto; white-space: pre-wrap; }
+  .log .pass { color: #4ade80; }
+  .log .fail { color: #f87171; }
+  .log .skip { color: #fbbf24; }
+  .log .info { color: #60a5fa; }
+</style>
+</head>
+<body>
+<h1>Smart Tools — QA Smoke Tests</h1>
+<p class="subtitle">Automated verification for all 19 previously-demo tools</p>
+
+<div class="controls">
+  <button class="primary" id="run-all">Run All Tests</button>
+  <button id="run-failed">Re-run Failed</button>
+  <button id="clear-log">Clear Log</button>
+  <span id="status" style="font-size:13px; color:#666"></span>
+</div>
+
+<div class="progress"><div class="progress-fill" id="progress"></div></div>
+
+<div class="summary">
+  <div class="summary-card"><div class="label">Total</div><div class="value" id="total">0</div></div>
+  <div class="summary-card"><div class="label">Passed</div><div class="value pass" id="passed">0</div></div>
+  <div class="summary-card"><div class="label">Failed</div><div class="value fail" id="failed">0</div></div>
+  <div class="summary-card"><div class="label">Skipped</div><div class="value skip" id="skipped">0</div></div>
+</div>
+
+<div class="results" id="results"></div>
+<div class="log" id="log"></div>
+
+<script>
+const TESTS = [
+  { id: "pdf-converter", name: "PDF Converter", category: "Convert", desc: "Convert PDF to JPG and TXT" },
+  { id: "edit-pdf", name: "Edit PDF", category: "View & Edit", desc: "Add text and shapes to PDF" },
+  { id: "pdf-annotator", name: "PDF Annotator", category: "View & Edit", desc: "Highlight and annotate PDF" },
+  { id: "redact-pdf", name: "Redact PDF", category: "View & Edit", desc: "Black out sensitive areas" },
+  { id: "share-pdf", name: "Share PDF", category: "View & Edit", desc: "Prepare PDF for sharing" },
+  { id: "pdf-to-word", name: "PDF to Word", category: "Convert from PDF", desc: "Extract text to .docx" },
+  { id: "pdf-to-excel", name: "PDF to Excel", category: "Convert from PDF", desc: "Extract data to .xlsx" },
+  { id: "pdf-to-ppt", name: "PDF to PPT", category: "Convert from PDF", desc: "Render pages to .pptx" },
+  { id: "word-to-pdf", name: "Word to PDF", category: "Convert to PDF", desc: "Convert .docx to PDF" },
+  { id: "excel-to-pdf", name: "Excel to PDF", category: "Convert to PDF", desc: "Convert .xlsx to PDF" },
+  { id: "ppt-to-pdf", name: "PPT to PDF", category: "Convert to PDF", desc: "Convert .pptx to PDF" },
+  { id: "pdf-ocr", name: "PDF OCR", category: "Convert to PDF", desc: "Recognize text with Tesseract.js" },
+  { id: "html-to-pdf", name: "HTML to PDF", category: "Convert to PDF", desc: "Convert HTML to PDF" },
+  { id: "rtf-to-pdf", name: "RTF to PDF", category: "Convert to PDF", desc: "Convert RTF to PDF" },
+  { id: "odt-to-pdf", name: "ODT to PDF", category: "Convert to PDF", desc: "Convert ODT to PDF" },
+  { id: "epub-to-pdf", name: "EPUB to PDF", category: "Convert to PDF", desc: "Convert EPUB to PDF" },
+  { id: "request-signatures", name: "Request Signatures", category: "Sign", desc: "Add signature fields" },
+  { id: "unlock-pdf", name: "Unlock PDF", category: "More", desc: "Remove PDF password" },
+  { id: "protect-pdf", name: "Protect PDF", category: "More", desc: "Add PDF protection" },
+];
+
+const results = new Map();
+let logEl, progressEl;
+
+function log(msg, cls) {
+  const line = document.createElement("div");
+  if (cls) line.className = cls;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function updateSummary() {
+  let pass = 0, fail = 0, skip = 0;
+  results.forEach(r => { if (r.status === "pass") pass++; else if (r.status === "fail") fail++; else if (r.status === "skip") skip++; });
+  document.getElementById("total").textContent = TESTS.length;
+  document.getElementById("passed").textContent = pass;
+  document.getElementById("failed").textContent = fail;
+  document.getElementById("skipped").textContent = skip;
+}
+
+function renderResults() {
+  const el = document.getElementById("results");
+  el.innerHTML = "";
+  TESTS.forEach(t => {
+    const r = results.get(t.id) || { status: "pending" };
+    const row = document.createElement("div");
+    row.className = "result-row";
+    row.innerHTML = `
+      <div class="status ${r.status}">${r.status === "pass" ? "✓" : r.status === "fail" ? "✗" : r.status === "skip" ? "–" : r.status === "running" ? "…" : "○"}</div>
+      <div class="name">${t.name}</div>
+      <div class="category">${t.category}</div>
+      <div class="detail">${r.detail || t.desc}</div>
+      <div class="time">${r.time ? r.time + "ms" : ""}</div>
+    `;
+    el.appendChild(row);
+  });
+}
+
+function createTestPDF(text, pages) {
+  const P = window.PDFLib;
+  return (async () => {
+    const doc = await P.PDFDocument.create();
+    const font = await doc.embedFont(P.StandardFonts.Helvetica);
+    for (let i = 0; i < (pages || 1); i++) {
+      const page = doc.addPage([595.28, 841.89]);
+      page.drawText(text || `Test page ${i + 1}`, { x: 72, y: 750, size: 16, font });
+      page.drawText("This is a test PDF generated for QA smoke tests.", { x: 72, y: 720, size: 10, font });
+    }
+    return new Blob([await doc.save()], { type: "application/pdf" });
+  })();
+}
+
+function createTestFile(content, name, type) {
+  return new File([content], name, { type });
+}
+
+async function runTest(test) {
+  const start = performance.now();
+  results.set(test.id, { status: "running", detail: "Running..." });
+  renderResults();
+  updateSummary();
+
+  try {
+    let result;
+    switch (test.id) {
+      case "pdf-converter":
+        result = await testPdfConverter();
+        break;
+      case "edit-pdf":
+        result = await testEditPdf();
+        break;
+      case "pdf-annotator":
+        result = await testPdfAnnotator();
+        break;
+      case "redact-pdf":
+        result = await testRedactPdf();
+        break;
+      case "share-pdf":
+        result = await testSharePdf();
+        break;
+      case "pdf-to-word":
+        result = await testPdfToWord();
+        break;
+      case "pdf-to-excel":
+        result = await testPdfToExcel();
+        break;
+      case "pdf-to-ppt":
+        result = await testPdfToPpt();
+        break;
+      case "word-to-pdf":
+        result = await testWordToPdf();
+        break;
+      case "excel-to-pdf":
+        result = await testExcelToPdf();
+        break;
+      case "ppt-to-pdf":
+        result = await testPptToPdf();
+        break;
+      case "pdf-ocr":
+        result = await testPdfOcr();
+        break;
+      case "html-to-pdf":
+        result = await testHtmlToPdf();
+        break;
+      case "rtf-to-pdf":
+        result = await testRtfToPdf();
+        break;
+      case "odt-to-pdf":
+        result = await testOdtToPdf();
+        break;
+      case "epub-to-pdf":
+        result = await testEpubToPdf();
+        break;
+      case "request-signatures":
+        result = await testRequestSignatures();
+        break;
+      case "unlock-pdf":
+        result = await testUnlockPdf();
+        break;
+      case "protect-pdf":
+        result = await testProtectPdf();
+        break;
+      default:
+        result = { pass: false, detail: "No test implementation" };
+    }
+
+    const elapsed = Math.round(performance.now() - start);
+    if (result.pass) {
+      results.set(test.id, { status: "pass", detail: result.detail, time: elapsed });
+      log(`✓ ${test.name}: ${result.detail}`, "pass");
+    } else {
+      results.set(test.id, { status: "fail", detail: result.detail, time: elapsed });
+      log(`✗ ${test.name}: ${result.detail}`, "fail");
+    }
+  } catch (e) {
+    const elapsed = Math.round(performance.now() - start);
+    results.set(test.id, { status: "fail", detail: e.message, time: elapsed });
+    log(`✗ ${test.name}: ${e.message}`, "fail");
+  }
+
+  renderResults();
+  updateSummary();
+}
+
+async function testPdfConverter() {
+  const pdfBlob = await createTestPDF("PDF Converter Test", 2);
+  const file = new File([pdfBlob], "test.pdf", { type: "application/pdf" });
+  const entry = { file, name: "test.pdf", ext: ".pdf", size: pdfBlob.size };
+  
+  state.tool = { id: "pdf-converter", output: { name: "converted.jpg", ext: "jpg" } };
+  state.files = [entry];
+  state.opts = { target: "jpg" };
+  state.ex = {};
+  
+  const handler = REAL_HANDLERS["pdf-converter"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  if (result.blob.type !== "image/jpeg" && result.blob.type !== "application/zip") return { pass: false, detail: "Wrong type: " + result.blob.type };
+  return { pass: true, detail: `Converted to JPG (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testEditPdf() {
+  const pdfBlob = await createTestPDF("Edit PDF Test");
+  const file = new File([pdfBlob], "test.pdf", { type: "application/pdf" });
+  const entry = { file, name: "test.pdf", ext: ".pdf", size: pdfBlob.size };
+  
+  state.tool = { id: "edit-pdf", output: { name: "edited.pdf", ext: "pdf" } };
+  state.files = [entry];
+  state.opts = {};
+  state.ex = { marks: [{ x: 20, y: 30, kind: "text" }], page: 1 };
+  
+  const handler = REAL_HANDLERS["edit-pdf"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  if (result.blob.type !== "application/pdf") return { pass: false, detail: "Wrong type" };
+  return { pass: true, detail: `Edited PDF (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testPdfAnnotator() {
+  const pdfBlob = await createTestPDF("Annotator Test");
+  const file = new File([pdfBlob], "test.pdf", { type: "application/pdf" });
+  const entry = { file, name: "test.pdf", ext: ".pdf", size: pdfBlob.size };
+  
+  state.tool = { id: "pdf-annotator", output: { name: "annotated.pdf", ext: "pdf" } };
+  state.files = [entry];
+  state.opts = {};
+  state.ex = { marks: [{ x: 20, y: 30, kind: "highlight" }], page: 1 };
+  
+  const handler = REAL_HANDLERS["pdf-annotator"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  return { pass: true, detail: `Annotated PDF (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testRedactPdf() {
+  const pdfBlob = await createTestPDF("Redact Test");
+  const file = new File([pdfBlob], "test.pdf", { type: "application/pdf" });
+  const entry = { file, name: "test.pdf", ext: ".pdf", size: pdfBlob.size };
+  
+  state.tool = { id: "redact-pdf", output: { name: "redacted.pdf", ext: "pdf" } };
+  state.files = [entry];
+  state.opts = {};
+  state.ex = { redactBoxes: [{ x: 10, y: 20, w: 80, h: 12 }], page: 1 };
+  
+  const handler = REAL_HANDLERS["redact-pdf"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  return { pass: true, detail: `Redacted PDF (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testSharePdf() {
+  const pdfBlob = await createTestPDF("Share Test");
+  const file = new File([pdfBlob], "test.pdf", { type: "application/pdf" });
+  const entry = { file, name: "test.pdf", ext: ".pdf", size: pdfBlob.size };
+  
+  state.tool = { id: "share-pdf", output: { name: "shared.pdf", ext: "pdf" } };
+  state.files = [entry];
+  state.opts = {};
+  state.ex = {};
+  
+  const handler = REAL_HANDLERS["share-pdf"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  return { pass: true, detail: `Share-ready PDF (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testPdfToWord() {
+  const pdfBlob = await createTestPDF("PDF to Word Test Content");
+  const file = new File([pdfBlob], "test.pdf", { type: "application/pdf" });
+  const entry = { file, name: "test.pdf", ext: ".pdf", size: pdfBlob.size };
+  
+  state.tool = { id: "pdf-to-word", output: { name: "converted.docx", ext: "docx" } };
+  state.files = [entry];
+  state.opts = {};
+  state.ex = {};
+  
+  const handler = REAL_HANDLERS["pdf-to-word"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  if (result.blob.type !== "application/vnd.openxmlformats-officedocument.wordprocessingml.document") return { pass: false, detail: "Wrong MIME type" };
+  return { pass: true, detail: `Word doc (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testPdfToExcel() {
+  const pdfBlob = await createTestPDF("PDF to Excel Test");
+  const file = new File([pdfBlob], "test.pdf", { type: "application/pdf" });
+  const entry = { file, name: "test.pdf", ext: ".pdf", size: pdfBlob.size };
+  
+  state.tool = { id: "pdf-to-excel", output: { name: "converted.xlsx", ext: "xlsx" } };
+  state.files = [entry];
+  state.opts = {};
+  state.ex = {};
+  
+  const handler = REAL_HANDLERS["pdf-to-excel"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  return { pass: true, detail: `Excel file (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testPdfToPpt() {
+  const pdfBlob = await createTestPDF("PDF to PPT Test", 3);
+  const file = new File([pdfBlob], "test.pdf", { type: "application/pdf" });
+  const entry = { file, name: "test.pdf", ext: ".pdf", size: pdfBlob.size };
+  
+  state.tool = { id: "pdf-to-ppt", output: { name: "converted.pptx", ext: "pptx" } };
+  state.files = [entry];
+  state.opts = {};
+  state.ex = {};
+  
+  const handler = REAL_HANDLERS["pdf-to-ppt"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  return { pass: true, detail: `PowerPoint (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testWordToPdf() {
+  const docx = await createTestDocx("Word to PDF test content");
+  const file = new File([docx], "test.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+  const entry = { file, name: "test.docx", ext: ".docx", size: docx.size };
+  
+  state.tool = { id: "word-to-pdf", output: { name: "converted.pdf", ext: "pdf" } };
+  state.files = [entry];
+  state.opts = {};
+  state.ex = {};
+  
+  const handler = REAL_HANDLERS["word-to-pdf"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  if (result.blob.type !== "application/pdf") return { pass: false, detail: "Wrong type" };
+  return { pass: true, detail: `PDF from Word (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testExcelToPdf() {
+  const xlsx = await createTestXlsx("Excel\tto\tPDF\ntest\tdata\there");
+  const file = new File([xlsx], "test.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const entry = { file, name: "test.xlsx", ext: ".xlsx", size: xlsx.size };
+  
+  state.tool = { id: "excel-to-pdf", output: { name: "converted.pdf", ext: "pdf" } };
+  state.files = [entry];
+  state.opts = { sheets: "active", orientation: "portrait" };
+  state.ex = {};
+  
+  const handler = REAL_HANDLERS["excel-to-pdf"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  return { pass: true, detail: `PDF from Excel (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testPptToPdf() {
+  const pptx = await createTestPptx("Slide 1 content\nSlide 2 content");
+  const file = new File([pptx], "test.pptx", { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" });
+  const entry = { file, name: "test.pptx", ext: ".pptx", size: pptx.size };
+  
+  state.tool = { id: "ppt-to-pdf", output: { name: "converted.pdf", ext: "pdf" } };
+  state.files = [entry];
+  state.opts = { perPage: "1", notes: false };
+  state.ex = {};
+  
+  const handler = REAL_HANDLERS["ppt-to-pdf"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  return { pass: true, detail: `PDF from PPT (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testPdfOcr() {
+  const pdfBlob = await createTestPDF("OCR Test Text");
+  const file = new File([pdfBlob], "test.pdf", { type: "application/pdf" });
+  const entry = { file, name: "test.pdf", ext: ".pdf", size: pdfBlob.size };
+  
+  state.tool = { id: "pdf-ocr", output: { name: "ocr.pdf", ext: "pdf" } };
+  state.files = [entry];
+  state.opts = { lang: "en", searchable: true, textfile: false };
+  state.ex = {};
+  
+  const handler = REAL_HANDLERS["pdf-ocr"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  return { pass: true, detail: `OCR PDF (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testHtmlToPdf() {
+  state.tool = { id: "html-to-pdf", output: { name: "webpage.pdf", ext: "pdf" } };
+  state.files = [];
+  state.opts = { size: "a4", orientation: "portrait", background: true };
+  state.ex = { htmlMode: "html", html: "<h1>Test</h1><p>HTML to PDF conversion test</p>", url: "" };
+  
+  const handler = REAL_HANDLERS["html-to-pdf"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  return { pass: true, detail: `PDF from HTML (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testRtfToPdf() {
+  const rtf = "{\\rtf1\\ansi RTF to PDF test content}";
+  const file = new File([rtf], "test.rtf", { type: "application/rtf" });
+  const entry = { file, name: "test.rtf", ext: ".rtf", size: rtf.length };
+  
+  state.tool = { id: "rtf-to-pdf", output: { name: "converted.pdf", ext: "pdf" } };
+  state.files = [entry];
+  state.opts = {};
+  state.ex = {};
+  
+  const handler = REAL_HANDLERS["rtf-to-pdf"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  return { pass: true, detail: `PDF from RTF (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testOdtToPdf() {
+  const odt = await createTestOdt("ODT to PDF test content");
+  const file = new File([odt], "test.odt", { type: "application/vnd.oasis.opendocument.text" });
+  const entry = { file, name: "test.odt", ext: ".odt", size: odt.size };
+  
+  state.tool = { id: "odt-to-pdf", output: { name: "converted.pdf", ext: "pdf" } };
+  state.files = [entry];
+  state.opts = {};
+  state.ex = {};
+  
+  const handler = REAL_HANDLERS["odt-to-pdf"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  return { pass: true, detail: `PDF from ODT (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testEpubToPdf() {
+  const epub = await createTestEpub("EPUB to PDF test content");
+  const file = new File([epub], "test.epub", { type: "application/epub+zip" });
+  const entry = { file, name: "test.epub", ext: ".epub", size: epub.size };
+  
+  state.tool = { id: "epub-to-pdf", output: { name: "converted.pdf", ext: "pdf" } };
+  state.files = [entry];
+  state.opts = { size: "a4", fontSize: 12 };
+  state.ex = {};
+  
+  const handler = REAL_HANDLERS["epub-to-pdf"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  return { pass: true, detail: `PDF from EPUB (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testRequestSignatures() {
+  const pdfBlob = await createTestPDF("Signature Request Test");
+  const file = new File([pdfBlob], "test.pdf", { type: "application/pdf" });
+  const entry = { file, name: "test.pdf", ext: ".pdf", size: pdfBlob.size };
+  
+  state.tool = { id: "request-signatures", output: { name: "signature-request.pdf", ext: "pdf" } };
+  state.files = [entry];
+  state.opts = {};
+  state.ex = { recipients: ["test@example.com", "signer@company.com"] };
+  
+  const handler = REAL_HANDLERS["request-signatures"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  return { pass: true, detail: `Signature PDF (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testUnlockPdf() {
+  const pdfBlob = await createTestPDF("Unlock Test");
+  const file = new File([pdfBlob], "test.pdf", { type: "application/pdf" });
+  const entry = { file, name: "test.pdf", ext: ".pdf", size: pdfBlob.size };
+  
+  state.tool = { id: "unlock-pdf", output: { name: "unlocked.pdf", ext: "pdf" } };
+  state.files = [entry];
+  state.opts = { password: "" };
+  state.ex = {};
+  
+  const handler = REAL_HANDLERS["unlock-pdf"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  return { pass: true, detail: `Unlocked PDF (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function testProtectPdf() {
+  const pdfBlob = await createTestPDF("Protect Test");
+  const file = new File([pdfBlob], "test.pdf", { type: "application/pdf" });
+  const entry = { file, name: "test.pdf", ext: ".pdf", size: pdfBlob.size };
+  
+  state.tool = { id: "protect-pdf", output: { name: "protected.pdf", ext: "pdf" } };
+  state.files = [entry];
+  state.opts = { password: "test123", confirmPassword: "test123" };
+  state.ex = {};
+  
+  const handler = REAL_HANDLERS["protect-pdf"];
+  if (!handler) return { pass: false, detail: "Handler not found" };
+  
+  const result = await handler(() => {});
+  if (!result.blob || result.blob.size === 0) return { pass: false, detail: "Empty output" };
+  return { pass: true, detail: `Protected PDF (${(result.blob.size / 1024).toFixed(1)} KB)` };
+}
+
+async function createTestDocx(text) {
+  const enc = new TextEncoder();
+  const paras = text.split("\n").filter(p => p.trim());
+  let bodyXml = "";
+  paras.forEach(p => {
+    const safe = p.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    bodyXml += '<w:p><w:r><w:t xml:space="preserve">' + safe + '</w:t></w:r></w:p>';
+  });
+  const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>';
+  const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
+  const docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' + bodyXml + '</w:body></w:document>';
+  return zipBlob([
+    { name: "[Content_Types].xml", data: enc.encode(contentTypes) },
+    { name: "_rels/.rels", data: enc.encode(rels) },
+    { name: "word/document.xml", data: enc.encode(docXml) },
+  ]);
+}
+
+async function createTestXlsx(text) {
+  const enc = new TextEncoder();
+  const rows = text.split("\n").filter(r => r.trim());
+  let sheetXml = '<sheetData>';
+  let ssXml = "";
+  let sharedStrings = [];
+  rows.forEach((row, ri) => {
+    const cells = row.split("\t");
+    sheetXml += '<row r="' + (ri + 1) + '">';
+    cells.forEach((cell, ci) => {
+      const ref = String.fromCharCode(65 + ci) + (ri + 1);
+      const safe = cell.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      if (/^-?\d+(\.\d+)?$/.test(cell.trim())) {
+        sheetXml += '<c r="' + ref + '"><v>' + cell.trim() + '</v></c>';
+      } else {
+        const idx = sharedStrings.length;
+        sharedStrings.push(safe);
+        ssXml += '<si><t>' + safe + '</t></si>';
+        sheetXml += '<c r="' + ref + '" t="s"><v>' + idx + '</v></c>';
+      }
+    });
+    sheetXml += '</row>';
+  });
+  sheetXml += '</sheetData>';
+  const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>';
+  const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
+  const workbook = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>';
+  const wbRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>';
+  const sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + sheetXml + '</worksheet>';
+  const shared = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="' + sharedStrings.length + '" uniqueCount="' + sharedStrings.length + '">' + ssXml + '</sst>';
+  return zipBlob([
+    { name: "[Content_Types].xml", data: enc.encode(contentTypes) },
+    { name: "_rels/.rels", data: enc.encode(rels) },
+    { name: "xl/workbook.xml", data: enc.encode(workbook) },
+    { name: "xl/_rels/workbook.xml.rels", data: enc.encode(wbRels) },
+    { name: "xl/worksheets/sheet1.xml", data: enc.encode(sheet) },
+    { name: "xl/sharedStrings.xml", data: enc.encode(shared) },
+  ]);
+}
+
+async function createTestPptx(text) {
+  const enc = new TextEncoder();
+  const slides = text.split("\n").filter(s => s.trim());
+  let slidesXml = "", contentOverrides = "";
+  const slideEntries = [];
+  for (let i = 0; i < slides.length; i++) {
+    const safe = slides[i].replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const slideXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>' + safe + '</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>';
+    slideEntries.push({ name: "ppt/slides/slide" + (i + 1) + ".xml", data: enc.encode(slideXml) });
+    slidesXml += '<p:sldId id="' + (256 + i) + '" r:id="rId' + (i + 2) + '"/>';
+    contentOverrides += '<Override PartName="/ppt/slides/slide' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>';
+  }
+  const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>' + contentOverrides + '</Types>';
+  const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/></Relationships>';
+  const presentation = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst>' + slidesXml + '</p:sldIdLst></p:presentation>';
+  let presRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+  for (let i = 0; i < slides.length; i++) presRels += '<Relationship Id="rId' + (i + 2) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide' + (i + 1) + '.xml"/>';
+  presRels += '</Relationships>';
+  return zipBlob([
+    { name: "[Content_Types].xml", data: enc.encode(contentTypes) },
+    { name: "_rels/.rels", data: enc.encode(rels) },
+    { name: "ppt/presentation.xml", data: enc.encode(presentation) },
+    { name: "ppt/_rels/presentation.xml.rels", data: enc.encode(presRels) },
+    ...slideEntries,
+  ]);
+}
+
+async function createTestOdt(text) {
+  const enc = new TextEncoder();
+  const content = '<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>' + text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") + '</text:p></office:text></office:body></office:document-content>';
+  const meta = '<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"></office:document-meta>';
+  const manifest = '<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:media-type="application/vnd.oasis.opendocument.text" manifest:full-path="/"/><manifest:file-entry manifest:media-type="text/xml" manifest:full-path="content.xml"/><manifest:file-entry manifest:media-type="text/xml" manifest:full-path="meta.xml"/></manifest:manifest>';
+  return zipBlob([
+    { name: "mimetype", data: enc.encode("application/vnd.oasis.opendocument.text") },
+    { name: "META-INF/manifest.xml", data: enc.encode(manifest) },
+    { name: "content.xml", data: enc.encode(content) },
+    { name: "meta.xml", data: enc.encode(meta) },
+  ]);
+}
+
+async function createTestEpub(text) {
+  const enc = new TextEncoder();
+  const container = '<?xml version="1.0" encoding="UTF-8"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>';
+  const opf = '<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" version="2.0"><manifest><item id="ch1" href="chapter1.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="ch1"/></spine></package>';
+  const chapter = '<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Chapter 1</title></head><body><p>' + text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") + '</p></body></html>';
+  return zipBlob([
+    { name: "mimetype", data: enc.encode("application/epub+zip") },
+    { name: "META-INF/container.xml", data: enc.encode(container) },
+    { name: "OEBPS/content.opf", data: enc.encode(opf) },
+    { name: "OEBPS/chapter1.xhtml", data: enc.encode(chapter) },
+  ]);
+}
+
+async function runAllTests() {
+  logEl.innerHTML = "";
+  results.clear();
+  renderResults();
+  updateSummary();
+  log("Starting QA smoke tests for 19 previously-demo tools", "info");
+  
+  let completed = 0;
+  for (const test of TESTS) {
+    document.getElementById("progress").style.width = ((completed / TESTS.length) * 100) + "%";
+    document.getElementById("status").textContent = `Running ${completed + 1} of ${TESTS.length}...`;
+    await runTest(test);
+    completed++;
+  }
+  
+  document.getElementById("progress").style.width = "100%";
+  document.getElementById("status").textContent = "All tests completed";
+  
+  const pass = [...results.values()].filter(r => r.status === "pass").length;
+  const fail = [...results.values()].filter(r => r.status === "fail").length;
+  log(`\n=== Test Summary ===`, "info");
+  log(`Total: ${TESTS.length} | Passed: ${pass} | Failed: ${fail}`, pass === TESTS.length ? "pass" : "fail");
+}
+
+document.getElementById("run-all").addEventListener("click", runAllTests);
+document.getElementById("run-failed").addEventListener("click", async () => {
+  const failed = TESTS.filter(t => results.get(t.id)?.status === "fail");
+  if (!failed.length) { log("No failed tests to re-run", "info"); return; }
+  log(`Re-running ${failed.length} failed tests...`, "info");
+  for (const test of failed) await runTest(test);
+});
+document.getElementById("clear-log").addEventListener("click", () => { logEl.innerHTML = ""; });
+
+window.addEventListener("DOMContentLoaded", () => {
+  logEl = document.getElementById("log");
+  progressEl = document.getElementById("progress");
+  renderResults();
+  updateSummary();
+  log("QA Smoke Tests ready. Click 'Run All Tests' to start.", "info");
+});
+</script>
+<script src="../index.html" onerror="log('Warning: Could not load main app for testing', 'skip')"></script>
+</body>
+</html>

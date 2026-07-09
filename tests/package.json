@@ -1,0 +1,13 @@
+{
+  "name": "smart-tools-tests",
+  "version": "1.0.0",
+  "description": "QA testing framework for Smart Tools",
+  "scripts": {
+    "test": "node headless-runner.js",
+    "test:browser": "open regression-test.html",
+    "test:smoke": "open smoke-test.html"
+  },
+  "devDependencies": {
+    "puppeteer": "^21.0.0"
+  }
+}

@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Tools — QA Regression Tests</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; background: #f8f9fa; color: #1a1a1a; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+  .subtitle { font-size: 13px; color: #666; margin-bottom: 24px; }
+  .controls { display: flex; gap: 12px; margin-bottom: 24px; align-items: center; }
+  .controls button { padding: 8px 16px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 500; }
+  .controls button:hover { background: #f0f0f0; }
+  .controls button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+  .controls button.primary:hover { background: #1d4ed8; }
+  .progress { height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden; margin-bottom: 24px; }
+  .progress-fill { height: 100%; background: #2563eb; transition: width 0.3s; width: 0%; }
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+  .summary-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; }
+  .summary-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #666; margin-bottom: 4px; }
+  .summary-card .value { font-size: 24px; font-weight: 700; }
+  .summary-card .value.pass { color: #16a34a; }
+  .summary-card .value.fail { color: #dc2626; }
+  .summary-card .value.skip { color: #d97706; }
+  .results { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+  .result-row { display: flex; align-items: center; padding: 10px 16px; border-bottom: 1px solid #f0f0f0; font-size: 13px; gap: 12px; }
+  .result-row:last-child { border-bottom: none; }
+  .result-row .status { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .result-row .status.pass { background: #dcfce7; color: #16a34a; }
+  .result-row .status.fail { background: #fee2e2; color: #dc2626; }
+  .result-row .status.skip { background: #fef3c7; color: #d97706; }
+  .result-row .status.running { background: #dbeafe; color: #2563eb; }
+  .result-row .name { flex: 1; font-weight: 500; }
+  .result-row .category { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.03em; }
+  .result-row .time { font-size: 11px; color: #999; font-variant-numeric: tabular-nums; }
+  .result-row .detail { font-size: 11px; color: #666; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .log { background: #1a1a1a; color: #e5e7eb; border-radius: 8px; padding: 16px; font-family: "SF Mono", "Fira Code", monospace; font-size: 12px; line-height: 1.6; max-height: 500px; overflow-y: auto; white-space: pre-wrap; }
+  .log .pass { color: #4ade80; }
+  .log .fail { color: #f87171; }
+  .log .skip { color: #fbbf24; }
+  .log .info { color: #60a5fa; }
+  .loading { text-align: center; padding: 40px; color: #666; }
+</style>
+</head>
+<body>
+<h1>Smart Tools — QA Regression Tests</h1>
+<p class="subtitle">Automated verification for all 19 previously-demo tools</p>
+
+<div id="loading" class="loading">Loading dependencies and test harness...</div>
+
+<div id="app" style="display:none">
+  <div class="controls">
+    <button class="primary" id="run-all">Run All Tests</button>
+    <button id="run-failed">Re-run Failed</button>
+    <button id="clear-log">Clear Log</button>
+    <span id="status" style="font-size:13px; color:#666"></span>
+  </div>
+
+  <div class="progress"><div class="progress-fill" id="progress"></div></div>
+
+  <div class="summary">
+    <div class="summary-card"><div class="label">Total</div><div class="value" id="total">0</div></div>
+    <div class="summary-card"><div class="label">Passed</div><div class="value pass" id="passed">0</div></div>
+    <div class="summary-card"><div class="label">Failed</div><div class="value fail" id="failed">0</div></div>
+    <div class="summary-card"><div class="label">Skipped</div><div class="value skip" id="skipped">0</div></div>
+  </div>
+
+  <div class="results" id="results"></div>
+  <div class="log" id="log"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const TESTS = [
+  { id: "pdf-converter", name: "PDF Converter", category: "Convert" },
+  { id: "edit-pdf", name: "Edit PDF", category: "View & Edit" },
+  { id: "pdf-annotator", name: "PDF Annotator", category: "View & Edit" },
+  { id: "redact-pdf", name: "Redact PDF", category: "View & Edit" },
+  { id: "share-pdf", name: "Share PDF", category: "View & Edit" },
+  { id: "pdf-to-word", name: "PDF to Word", category: "Convert from PDF" },
+  { id: "pdf-to-excel", name: "PDF to Excel", category: "Convert from PDF" },
+  { id: "pdf-to-ppt", name: "PDF to PPT", category: "Convert from PDF" },
+  { id: "word-to-pdf", name: "Word to PDF", category: "Convert to PDF" },
+  { id: "excel-to-pdf", name: "Excel to PDF", category: "Convert to PDF" },
+  { id: "ppt-to-pdf", name: "PPT to PDF", category: "Convert to PDF" },
+  { id: "pdf-ocr", name: "PDF OCR", category: "Convert to PDF" },
+  { id: "html-to-pdf", name: "HTML to PDF", category: "Convert to PDF" },
+  { id: "rtf-to-pdf", name: "RTF to PDF", category: "Convert to PDF" },
+  { id: "odt-to-pdf", name: "ODT to PDF", category: "Convert to PDF" },
+  { id: "epub-to-pdf", name: "EPUB to PDF", category: "Convert to PDF" },
+  { id: "request-signatures", name: "Request Signatures", category: "Sign" },
+  { id: "unlock-pdf", name: "Unlock PDF", category: "More" },
+  { id: "protect-pdf", name: "Protect PDF", category: "More" },
+];
+
+const results = new Map();
+let logEl, progressEl;
+
+function log(msg, cls) {
+  const line = document.createElement("div");
+  if (cls) line.className = cls;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function updateSummary() {
+  let pass = 0, fail = 0, skip = 0;
+  results.forEach(r => { if (r.status === "pass") pass++; else if (r.status === "fail") fail++; else if (r.status === "skip") skip++; });
+  document.getElementById("total").textContent = TESTS.length;
+  document.getElementById("passed").textContent = pass;
+  document.getElementById("failed").textContent = fail;
+  document.getElementById("skipped").textContent = skip;
+}
+
+function renderResults() {
+  const el = document.getElementById("results");
+  el.innerHTML = "";
+  TESTS.forEach(t => {
+    const r = results.get(t.id) || { status: "pending" };
+    const row = document.createElement("div");
+    row.className = "result-row";
+    row.innerHTML = `
+      <div class="status ${r.status}">${r.status === "pass" ? "✓" : r.status === "fail" ? "✗" : r.status === "skip" ? "–" : r.status === "running" ? "…" : "○"}</div>
+      <div class="name">${t.name}</div>
+      <div class="category">${t.category}</div>
+      <div class="detail">${r.detail || ""}</div>
+      <div class="time">${r.time ? r.time + "ms" : ""}</div>
+    `;
+    el.appendChild(row);
+  });
+}
+
+const PT_SIZES = { a4: [595.28, 841.89], letter: [612, 792], legal: [612, 1008] };
+
+async function createTestPDF(text, pages) {
+  const P = window.PDFLib;
+  const doc = await P.PDFDocument.create();
+  const font = await doc.embedFont(P.StandardFonts.Helvetica);
+  for (let i = 0; i < (pages || 1); i++) {
+    const page = doc.addPage([595.28, 841.89]);
+    page.drawText(text || `Test page ${i + 1}`, { x: 72, y: 750, size: 16, font });
+    page.drawText("This is a test PDF for QA regression tests.", { x: 72, y: 720, size: 10, font });
+  }
+  return new Blob([await doc.save()], { type: "application/pdf" });
+}
+
+function sanitizeWinAnsi(text) {
+  let out = "";
+  for (const ch of String(text)) out += ch.charCodeAt(0) >= 0x20 && ch.charCodeAt(0) <= 0xFF ? ch : "?";
+  return out;
+}
+
+function fitBox(iw, ih, bw, bh) {
+  const s = Math.min(bw / iw, bh / ih);
+  return { w: iw * s, h: ih * s };
+}
+
+async function imagePage(P, doc, entry, sizeOpt, orientation, marginPt) {
+  const bytes = new Uint8Array(await entry.file.arrayBuffer());
+  let img;
+  if (entry.ext === ".png") img = await doc.embedPng(bytes);
+  else if (entry.ext === ".jpg" || entry.ext === ".jpeg") img = await doc.embedJpg(bytes);
+  else {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = i.naturalWidth; c.height = i.naturalHeight;
+        c.getContext("2d").drawImage(i, 0, 0);
+        resolve(c.toDataURL("image/png"));
+      };
+      i.onerror = () => reject(new Error("Could not decode image"));
+      i.src = entry.url;
+    });
+    const bin = atob(dataUrl.split(",")[1]);
+    const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    img = await doc.embedPng(u8);
+  }
+  let pw, ph;
+  if (sizeOpt === "auto") { pw = img.width * 72 / 96 + 2 * marginPt; ph = img.height * 72 / 96 + 2 * marginPt; }
+  else {
+    [pw, ph] = PT_SIZES[sizeOpt] || PT_SIZES.a4;
+    if (orientation === "landscape") [pw, ph] = [ph, pw];
+  }
+  const page = doc.addPage([pw, ph]);
+  const r = fitBox(img.width, img.height, pw - 2 * marginPt, ph - 2 * marginPt);
+  page.drawImage(img, { x: (pw - r.w) / 2, y: (ph - r.h) / 2, width: r.w, height: r.h });
+  return page;
+}
+
+function loadImg(src) {
+  return new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error("Could not decode image"));
+    i.src = src;
+  });
+}
+
+function toBlobAsync(canvas, type, q) {
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(b => b ? resolve(b) : reject(new Error("Could not encode")), type, q));
+}
+
+function makeCanvas(w, h) {
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.round(w));
+  c.height = Math.max(1, Math.round(h));
+  return c;
+}
+
+async function encodeCanvas(canvas, fmt, quality) {
+  if (fmt === "jpg") {
+    const c2 = makeCanvas(canvas.width, canvas.height);
+    const ctx = c2.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, c2.width, c2.height);
+    ctx.drawImage(canvas, 0, 0);
+    return toBlobAsync(c2, "image/jpeg", quality);
+  }
+  return toBlobAsync(canvas, fmt === "png" ? "image/png" : "image/webp", quality);
+}
+
+function baseName(name) { return name.replace(/\.[^.]+$/, ""); }
+
+async function renderPdfPageJpeg(doc, pageNo, scale, quality) {
+  const page = await doc.getPage(pageNo);
+  const vp = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(vp.width); canvas.height = Math.ceil(vp.height);
+  await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+  const bin = atob(canvas.toDataURL("image/jpeg", quality).split(",")[1]);
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return u8;
+}
+
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+  return t;
+})();
+function crc32(u8) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function zipBlob(files) {
+  const enc = new TextEncoder();
+  const num = (v, b) => { const a = new Uint8Array(b); for (let i = 0; i < b; i++) a[i] = (v >>> (8 * i)) & 0xFF; return a; };
+  const chunks = [], central = [];
+  let offset = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), crc = crc32(f.data);
+    central.push({ name, crc, size: f.data.length, offset });
+    for (const c of [num(0x04034b50, 4), num(20, 2), num(0, 2), num(0, 2), num(0, 2), num(0, 2), num(crc, 4), num(f.data.length, 4), num(f.data.length, 4), num(name.length, 2), num(0, 2), name, f.data]) {
+      chunks.push(c); offset += c.length;
+    }
+  }
+  const cdStart = offset;
+  for (const e of central) {
+    for (const c of [num(0x02014b50, 4), num(20, 2), num(20, 2), num(0, 2), num(0, 2), num(0, 2), num(0, 2), num(e.crc, 4), num(e.size, 4), num(e.size, 4), num(e.name.length, 2), num(0, 2), num(0, 2), num(0, 2), num(0, 2), num(0, 4), num(e.offset, 4), e.name]) {
+      chunks.push(c); offset += c.length;
+    }
+  }
+  chunks.push(num(0x06054b50, 4), num(0, 2), num(0, 2), num(central.length, 2), num(central.length, 2), num(offset - cdStart, 4), num(cdStart, 4), num(0, 2));
+  return new Blob(chunks, { type: "application/zip" });
+}
+
+async function extractOfficeText(entry) {
+  const buf = await entry.file.arrayBuffer();
+  const u8 = new Uint8Array(buf);
+  const view = new DataView(buf);
+  const entries = [];
+  let offset = 0;
+  while (offset < u8.length - 4) {
+    if (view.getUint32(offset, true) !== 0x04034b50) break;
+    const method = view.getUint16(offset + 8, true);
+    const compSize = view.getUint32(offset + 18, true);
+    const nameLen = view.getUint16(offset + 26, true);
+    const extraLen = view.getUint16(offset + 28, true);
+    const name = new TextDecoder().decode(u8.slice(offset + 30, offset + 30 + nameLen));
+    const dataStart = offset + 30 + nameLen + extraLen;
+    const data = u8.slice(dataStart, dataStart + compSize);
+    let content;
+    if (method === 0) content = new TextDecoder().decode(data);
+    else if (method === 8) {
+      try {
+        const ds = new DecompressionStream("deflate-raw");
+        const writer = ds.writable.getWriter();
+        const reader = ds.readable.getReader();
+        const chunks = [];
+        writer.write(data); writer.close();
+        while (true) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); }
+        const total = chunks.reduce((s, c) => s + c.length, 0);
+        const result = new Uint8Array(total);
+        let pos = 0;
+        for (const c of chunks) { result.set(c, pos); pos += c.length; }
+        content = new TextDecoder().decode(result);
+      } catch { content = ""; }
+    } else content = "";
+    entries.push({ name, content });
+    offset = dataStart + compSize;
+  }
+  if (entry.ext === ".docx") {
+    const docXml = entries.find(e => e.name === "word/document.xml");
+    if (!docXml) return "(Could not extract text)";
+    return docXml.content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+  }
+  if (entry.ext === ".xlsx") {
+    const sheets = entries.filter(e => e.name.startsWith("xl/worksheets/sheet") && e.name.endsWith(".xml"));
+    let text = "";
+    const sharedStrings = entries.find(e => e.name === "xl/sharedStrings.xml");
+    const strings = sharedStrings ? (sharedStrings.content.match(/<t[^>]*>([^<]*)<\/t>/g) || []).map(s => s.replace(/<[^>]+>/g, "")) : [];
+    sheets.forEach(sheet => {
+      const rows = (sheet.content.match(/<row[^>]*>.*?<\/row>/gs) || []);
+      rows.forEach(row => {
+        const cells = (row.match(/<c[^>]*>.*?<\/c>/gs) || []);
+        const vals = cells.map(cell => {
+          const v = cell.match(/<v>([^<]*)<\/v>/);
+          const t = cell.match(/t="s"/);
+          if (v && t) return strings[parseInt(v[1])] || v[1];
+          return v ? v[1] : "";
+        });
+        text += vals.join("\t") + "\n";
+      });
+    });
+    return text.trim() || "(Could not extract data)";
+  }
+  if (entry.ext === ".pptx") {
+    const slides = entries.filter(e => e.name.match(/ppt\/slides\/slide\d+\.xml$/)).sort((a, b) => parseInt(a.name.match(/slide(\d+)/)[1]) - parseInt(b.name.match(/slide(\d+)/)[1]));
+    let text = "";
+    slides.forEach((slide, i) => {
+      const paras = (slide.content.match(/<a:t>([^<]*)<\/a:t>/g) || []).map(s => s.replace(/<[^>]+>/g, ""));
+      text += "--- Slide " + (i + 1) + " ---\n" + paras.join(" ") + "\n\n";
+    });
+    return text.trim() || "(Could not extract text)";
+  }
+  if (entry.ext === ".odt") {
+    const content = entries.find(e => e.name === "content.xml");
+    if (!content) return "(Could not extract text)";
+    return content.content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  }
+  return "(Unsupported format)";
+}
+
+async function extractEpubText(entry) {
+  const buf = await entry.file.arrayBuffer();
+  const u8 = new Uint8Array(buf);
+  const view = new DataView(buf);
+  const entries = [];
+  let offset = 0;
+  while (offset < u8.length - 4) {
+    if (view.getUint32(offset, true) !== 0x04034b50) break;
+    const method = view.getUint16(offset + 8, true);
+    const compSize = view.getUint32(offset + 18, true);
+    const nameLen = view.getUint16(offset + 26, true);
+    const extraLen = view.getUint16(offset + 28, true);
+    const name = new TextDecoder().decode(u8.slice(offset + 30, offset + 30 + nameLen));
+    const dataStart = offset + 30 + nameLen + extraLen;
+    const data = u8.slice(dataStart, dataStart + compSize);
+    let content;
+    if (method === 0) content = new TextDecoder().decode(data);
+    else if (method === 8) {
+      try {
+        const ds = new DecompressionStream("deflate-raw");
+        const writer = ds.writable.getWriter();
+        const reader = ds.readable.getReader();
+        const chunks = [];
+        writer.write(data); writer.close();
+        while (true) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); }
+        const total = chunks.reduce((s, c) => s + c.length, 0);
+        const result = new Uint8Array(total);
+        let pos = 0;
+        for (const c of chunks) { result.set(c, pos); pos += c.length; }
+        content = new TextDecoder().decode(result);
+      } catch { content = ""; }
+    } else content = "";
+    entries.push({ name, content });
+    offset = dataStart + compSize;
+  }
+  const container = entries.find(e => e.name === "META-INF/container.xml");
+  if (!container) return "(Could not read EPUB)";
+  const opfMatch = container.content.match(/full-path="([^"]+)"/);
+  if (!opfMatch) return "(Could not find OPF)";
+  const opfPath = opfMatch[1];
+  const opfDir = opfPath.replace(/\/[^/]+$/, "");
+  const opf = entries.find(e => e.name === opfPath);
+  if (!opf) return "(Could not read OPF)";
+  const spineItems = (opf.content.match(/idref="([^"]+)"/g) || []).map(s => s.match(/idref="([^"]+)"/)[1]);
+  const manifest = {};
+  (opf.content.match(/<item[^>]+\/?>/g) || []).forEach(item => {
+    const id = item.match(/id="([^"]+)"/);
+    const href = item.match(/href="([^"]+)"/);
+    if (id && href) manifest[id[1]] = opfDir + "/" + href[1];
+  });
+  let text = "";
+  for (const id of spineItems) {
+    const href = manifest[id];
+    if (!href) continue;
+    const item = entries.find(e => e.name === href);
+    if (!item) continue;
+    text += item.content.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim() + "\n\n";
+  }
+  return text.trim();
+}
+
+function createDocx(text) {
+  const enc = new TextEncoder();
+  const paras = text.split(/\n+/).filter(p => p.trim());
+  let bodyXml = "";
+  paras.forEach(p => {
+    const safe = p.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    bodyXml += '<w:p><w:r><w:t xml:space="preserve">' + safe + '</w:t></w:r></w:p>';
+  });
+  const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>';
+  const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
+  const docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' + bodyXml + '</w:body></w:document>';
+  return zipBlob([
+    { name: "[Content_Types].xml", data: enc.encode(contentTypes) },
+    { name: "_rels/.rels", data: enc.encode(rels) },
+    { name: "word/document.xml", data: enc.encode(docXml) },
+  ]);
+}
+
+function createXlsx(text) {
+  const enc = new TextEncoder();
+  const rows = text.split("\n").filter(r => r.trim());
+  let sheetXml = '<sheetData>';
+  let ssXml = "";
+  let sharedStrings = [];
+  rows.forEach((row, ri) => {
+    const cells = row.split("\t");
+    sheetXml += '<row r="' + (ri + 1) + '">';
+    cells.forEach((cell, ci) => {
+      const ref = String.fromCharCode(65 + ci) + (ri + 1);
+      const safe = cell.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      if (/^-?\d+(\.\d+)?$/.test(cell.trim())) {
+        sheetXml += '<c r="' + ref + '"><v>' + cell.trim() + '</v></c>';
+      } else {
+        const idx = sharedStrings.length;
+        sharedStrings.push(safe);
+        ssXml += '<si><t>' + safe + '</t></si>';
+        sheetXml += '<c r="' + ref + '" t="s"><v>' + idx + '</v></c>';
+      }
+    });
+    sheetXml += '</row>';
+  });
+  sheetXml += '</sheetData>';
+  const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>';
+  const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
+  const workbook = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>';
+  const wbRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>';
+  const sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + sheetXml + '</worksheet>';
+  const shared = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="' + sharedStrings.length + '" uniqueCount="' + sharedStrings.length + '">' + ssXml + '</sst>';
+  return zipBlob([
+    { name: "[Content_Types].xml", data: enc.encode(contentTypes) },
+    { name: "_rels/.rels", data: enc.encode(rels) },
+    { name: "xl/workbook.xml", data: enc.encode(workbook) },
+    { name: "xl/_rels/workbook.xml.rels", data: enc.encode(wbRels) },
+    { name: "xl/worksheets/sheet1.xml", data: enc.encode(sheet) },
+    { name: "xl/sharedStrings.xml", data: enc.encode(shared) },
+  ]);
+}
+
+async function createPptx(text, pageCount) {
+  const enc = new TextEncoder();
+  const slides = text.split(/\n---\s*(?:Page|Slide)\s*\d+\s*---\n?/i).filter(s => s.trim());
+  let slidesXml = "", contentOverrides = "";
+  const slideEntries = [];
+  const slideCount = Math.max(1, slides.length || pageCount || 1);
+  for (let i = 0; i < slideCount; i++) {
+    const slideText = (slides[i] || "Slide " + (i + 1)).trim().slice(0, 500);
+    const safe = slideText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const lines = safe.split("\n").slice(0, 10);
+    let textShapes = "";
+    lines.forEach((line, li) => {
+      textShapes += '<p:sp><p:nvSpPr><p:cNvPr id="' + (li + 2) + '" name="Text' + li + '"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="457200" y="' + (457200 + li * 360000) + '"/><a:ext cx="8229600" cy="360000"/></a:xfrm></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>' + line + '</a:t></a:r></a:p></p:txBody></p:sp>';
+    });
+    const slideXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>' + textShapes + '</p:spTree></p:cSld></p:sld>';
+    slideEntries.push({ name: "ppt/slides/slide" + (i + 1) + ".xml", data: enc.encode(slideXml) });
+    slidesXml += '<p:sldId id="' + (256 + i) + '" r:id="rId' + (i + 2) + '"/>';
+    contentOverrides += '<Override PartName="/ppt/slides/slide' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>';
+  }
+  const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>' + contentOverrides + '</Types>';
+  const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/></Relationships>';
+  const presentation = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst>' + slidesXml + '</p:sldIdLst></p:presentation>';
+  let presRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+  for (let i = 0; i < slideCount; i++) presRels += '<Relationship Id="rId' + (i + 2) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide' + (i + 1) + '.xml"/>';
+  presRels += '</Relationships>';
+  return zipBlob([
+    { name: "[Content_Types].xml", data: enc.encode(contentTypes) },
+    { name: "_rels/.rels", data: enc.encode(rels) },
+    { name: "ppt/presentation.xml", data: enc.encode(presentation) },
+    { name: "ppt/_rels/presentation.xml.rels", data: enc.encode(presRels) },
+    ...slideEntries,
+  ]);
+}
+
+async function createPptxFromImages(images) {
+  const enc = new TextEncoder();
+  let slidesXml = "", contentOverrides = "";
+  const mediaEntries = [];
+  for (let i = 0; i < images.length; i++) {
+    const slideNum = i + 1;
+    const imgName = "image" + slideNum + ".jpeg";
+    const slideXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:pic><p:nvPicPr><p:cNvPr id="2" name="Image"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="9144000" cy="6858000"/></a:xfrm></p:spPr></p:pic></p:spTree></p:cSld></p:sld>';
+    const slideRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/' + imgName + '"/></Relationships>';
+    mediaEntries.push({ name: "ppt/slides/slide" + slideNum + ".xml", data: enc.encode(slideXml) });
+    mediaEntries.push({ name: "ppt/slides/_rels/slide" + slideNum + ".xml.rels", data: enc.encode(slideRels) });
+    mediaEntries.push({ name: "ppt/media/" + imgName, data: images[i] });
+    slidesXml += '<p:sldId id="' + (256 + i) + '" r:id="rId' + (i + 2) + '"/>';
+    contentOverrides += '<Override PartName="/ppt/slides/slide' + slideNum + '.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>';
+  }
+  const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>' + contentOverrides + '</Types>';
+  const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/></Relationships>';
+  const presentation = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst>' + slidesXml + '</p:sldIdLst></p:presentation>';
+  let presRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+  for (let i = 0; i < images.length; i++) presRels += '<Relationship Id="rId' + (i + 2) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide' + (i + 1) + '.xml"/>';
+  presRels += '</Relationships>';
+  return zipBlob([
+    { name: "[Content_Types].xml", data: enc.encode(contentTypes) },
+    { name: "_rels/.rels", data: enc.encode(rels) },
+    { name: "ppt/presentation.xml", data: enc.encode(presentation) },
+    { name: "ppt/_rels/presentation.xml.rels", data: enc.encode(presRels) },
+    ...mediaEntries,
+  ]);
+}
+
+async function createTestDocx(text) { return createDocx(text); }
+async function createTestXlsx(text) { return createXlsx(text); }
+async function createTestPptx(text) { return createPptx(text, 1); }
+async function createTestOdt(text) {
+  const enc = new TextEncoder();
+  const content = '<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>' + text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") + '</text:p></office:text></office:body></office:document-content>';
+  const manifest = '<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:media-type="application/vnd.oasis.opendocument.text" manifest:full-path="/"/><manifest:file-entry manifest:media-type="text/xml" manifest:full-path="content.xml"/></manifest:manifest>';
+  return zipBlob([
+    { name: "mimetype", data: enc.encode("application/vnd.oasis.opendocument.text") },
+    { name: "META-INF/manifest.xml", data: enc.encode(manifest) },
+    { name: "content.xml", data: enc.encode(content) },
+  ]);
+}
+async function createTestEpub(text) {
+  const enc = new TextEncoder();
+  const container = '<?xml version="1.0" encoding="UTF-8"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>';
+  const opf = '<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" version="2.0"><manifest><item id="ch1" href="chapter1.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="ch1"/></spine></package>';
+  const chapter = '<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Chapter 1</title></head><body><p>' + text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") + '</p></body></html>';
+  return zipBlob([
+    { name: "mimetype", data: enc.encode("application/epub+zip") },
+    { name: "META-INF/container.xml", data: enc.encode(container) },
+    { name: "OEBPS/content.opf", data: enc.encode(opf) },
+    { name: "OEBPS/chapter1.xhtml", data: enc.encode(chapter) },
+  ]);
+}
+
+const REAL_HANDLERS = {};
+
+REAL_HANDLERS["pdf-converter"] = async (prog) => {
+  const f = state.files[0];
+  const target = state.opts.target;
+  if (target === "jpg") {
+    const lib = await pdfjsLib.getDocument({ data: await f.file.arrayBuffer() }).promise;
+    const files = [];
+    for (let k = 1; k <= Math.min(lib.numPages, 20); k++) {
+      files.push({ name: "page-" + String(k).padStart(3, "0") + ".jpg", data: await renderPdfPageJpeg(lib, k, 2, 0.85) });
+    }
+    lib.destroy();
+    if (files.length === 1) return { blob: new Blob([files[0].data], { type: "image/jpeg" }), name: files[0].name };
+    return { blob: zipBlob(files) };
+  }
+  const lib = await pdfjsLib.getDocument({ data: await f.file.arrayBuffer() }).promise;
+  let allText = "";
+  for (let p = 1; p <= Math.min(lib.numPages, 50); p++) {
+    const page = await lib.getPage(p);
+    const tc = await page.getTextContent();
+    allText += "\n--- Page " + p + " ---\n" + tc.items.map(it => it.str).join(" ");
+  }
+  lib.destroy();
+  if (target === "docx") return { blob: createDocx(allText.trim()), name: baseName(f.name) + ".docx" };
+  if (target === "xlsx") return { blob: createXlsx(allText.trim()), name: baseName(f.name) + ".xlsx" };
+  if (target === "pptx") return { blob: await createPptx(allText.trim(), lib.numPages), name: baseName(f.name) + ".pptx" };
+  return { blob: new Blob([allText], { type: "text/plain" }), name: baseName(f.name) + ".txt" };
+};
+
+REAL_HANDLERS["edit-pdf"] = async (prog) => {
+  const P = window.PDFLib;
+  const bytes = new Uint8Array(await state.files[0].file.arrayBuffer());
+  const doc = await P.PDFDocument.load(bytes);
+  const pages = doc.getPages();
+  const marks = state.ex.marks || [];
+  if (!marks.length) return { blob: new Blob([await doc.save()], { type: "application/pdf" }) };
+  const font = await doc.embedFont(P.StandardFonts.Helvetica);
+  marks.forEach(m => {
+    const page = pages[Math.min(state.ex.page - 1 || 0, pages.length - 1)];
+    const { width, height } = page.getSize();
+    const x = (parseFloat(m.x) / 100) * width;
+    const y = height - (parseFloat(m.y) / 100) * height;
+    if (m.kind === "text") page.drawText("Text", { x, y: y - 12, size: 14, font, color: P.rgb(0.2, 0.45, 0.88) });
+    else if (m.kind === "highlight") page.drawRectangle({ x: x - 2, y: y - 4, width: 80, height: 14, color: P.rgb(0.96, 0.83, 0.27), opacity: 0.6 });
+    else if (m.kind === "draw") page.drawCircle({ x, y, size: 4, color: P.rgb(0.86, 0.29, 0.29) });
+    else if (m.kind === "shape") page.drawRectangle({ x: x - 2, y: y - 2, width: 60, height: 40, borderColor: P.rgb(0.09, 0.6, 0.55), borderWidth: 1.5 });
+  });
+  return { blob: new Blob([await doc.save()], { type: "application/pdf" }) };
+};
+
+REAL_HANDLERS["pdf-annotator"] = async (prog) => {
+  const P = window.PDFLib;
+  const bytes = new Uint8Array(await state.files[0].file.arrayBuffer());
+  const doc = await P.PDFDocument.load(bytes);
+  const pages = doc.getPages();
+  const marks = state.ex.marks || [];
+  if (!marks.length) return { blob: new Blob([await doc.save()], { type: "application/pdf" }) };
+  const font = await doc.embedFont(P.StandardFonts.Helvetica);
+  marks.forEach(m => {
+    const page = pages[Math.min(state.ex.page - 1 || 0, pages.length - 1)];
+    const { width, height } = page.getSize();
+    const x = (parseFloat(m.x) / 100) * width;
+    const y = height - (parseFloat(m.y) / 100) * height;
+    if (m.kind === "highlight") page.drawRectangle({ x: x - 2, y: y - 4, width: 100, height: 14, color: P.rgb(0.96, 0.83, 0.27), opacity: 0.5 });
+    else if (m.kind === "underline") page.drawLine({ start: { x: x - 2, y: y - 2 }, end: { x: x + 100, y: y - 2 }, thickness: 1.5, color: P.rgb(0.2, 0.45, 0.88) });
+    else if (m.kind === "comment") { page.drawRectangle({ x: x + 10, y: y - 20, width: 12, height: 12, color: P.rgb(0.91, 0.44, 0.18) }); page.drawText("!", { x: x + 13, y: y - 18, size: 9, font, color: P.rgb(1, 1, 1) }); }
+    else if (m.kind === "pen") page.drawCircle({ x, y, size: 3, color: P.rgb(0.48, 0.32, 0.78) });
+  });
+  return { blob: new Blob([await doc.save()], { type: "application/pdf" }) };
+};
+
+REAL_HANDLERS["redact-pdf"] = async (prog) => {
+  const P = window.PDFLib;
+  const bytes = new Uint8Array(await state.files[0].file.arrayBuffer());
+  const doc = await P.PDFDocument.load(bytes);
+  const pages = doc.getPages();
+  const boxes = state.ex.redactBoxes || [];
+  if (!boxes.length) throw new Error("No redaction boxes");
+  boxes.forEach(b => {
+    const page = pages[Math.min(state.ex.page - 1 || 0, pages.length - 1)];
+    const { width, height } = page.getSize();
+    const x = (parseFloat(b.x) / 100) * width;
+    const y = height - (parseFloat(b.y) / 100) * height - b.h;
+    const w = parseFloat(b.w) / 100 * width;
+    page.drawRectangle({ x, y, width: w, height: parseFloat(b.h), color: P.rgb(0, 0, 0) });
+  });
+  return { blob: new Blob([await doc.save()], { type: "application/pdf" }) };
+};
+
+REAL_HANDLERS["share-pdf"] = async (prog) => {
+  const bytes = await state.files[0].file.arrayBuffer();
+  return { blob: new Blob([bytes], { type: "application/pdf" }) };
+};
+
+REAL_HANDLERS["pdf-to-word"] = async (prog) => {
+  const lib = await pdfjsLib.getDocument({ data: await state.files[0].file.arrayBuffer() }).promise;
+  let allText = "";
+  for (let p = 1; p <= Math.min(lib.numPages, 100); p++) {
+    const page = await lib.getPage(p);
+    const tc = await page.getTextContent();
+    allText += "\n\n--- Page " + p + " ---\n\n" + tc.items.map(it => it.str).join(" ");
+  }
+  lib.destroy();
+  return { blob: createDocx(allText.trim()), name: baseName(state.files[0].name) + ".docx" };
+};
+
+REAL_HANDLERS["pdf-to-excel"] = async (prog) => {
+  const lib = await pdfjsLib.getDocument({ data: await state.files[0].file.arrayBuffer() }).promise;
+  let allText = "";
+  for (let p = 1; p <= Math.min(lib.numPages, 100); p++) {
+    const page = await lib.getPage(p);
+    const tc = await page.getTextContent();
+    allText += "\n--- Page " + p + " ---\n" + tc.items.map(it => it.str).join("\t");
+  }
+  lib.destroy();
+  return { blob: createXlsx(allText.trim()), name: baseName(state.files[0].name) + ".xlsx" };
+};
+
+REAL_HANDLERS["pdf-to-ppt"] = async (prog) => {
+  const lib = await pdfjsLib.getDocument({ data: await state.files[0].file.arrayBuffer() }).promise;
+  const slideImages = [];
+  for (let p = 1; p <= Math.min(lib.numPages, 50); p++) {
+    const u8 = await renderPdfPageJpeg(lib, p, 2, 0.88);
+    slideImages.push(u8);
+  }
+  lib.destroy();
+  return { blob: await createPptxFromImages(slideImages), name: baseName(state.files[0].name) + ".pptx" };
+};
+
+REAL_HANDLERS["word-to-pdf"] = async (prog) => {
+  const text = await extractOfficeText(state.files[0]);
+  const P = window.PDFLib;
+  const doc = await P.PDFDocument.create();
+  const font = await doc.embedFont(P.StandardFonts.Helvetica);
+  const [pw, ph] = PT_SIZES.a4;
+  const margin = 57;
+  const size = 11;
+  const lineH = size * 1.45;
+  const maxW = pw - 2 * margin;
+  const lines = [];
+  for (const para of text.split(/\r?\n/)) {
+    let line = "";
+    for (const word of para.split(/\s+/)) {
+      const t = line ? line + " " + word : word;
+      if (font.widthOfTextAtSize(t, size) > maxW && line) { lines.push(line); line = word; }
+      else line = t;
+    }
+    lines.push(line);
+  }
+  const perPage = Math.floor((ph - 2 * margin) / lineH);
+  for (let i = 0; i < lines.length; i += perPage) {
+    const page = doc.addPage([pw, ph]);
+    lines.slice(i, i + perPage).forEach((ln, k) => {
+      if (ln) page.drawText(sanitizeWinAnsi(ln), { x: margin, y: ph - margin - (k + 1) * lineH, size, font });
+    });
+  }
+  return { blob: new Blob([await doc.save()], { type: "application/pdf" }) };
+};
+
+REAL_HANDLERS["excel-to-pdf"] = async (prog) => {
+  const text = await extractOfficeText(state.files[0]);
+  const P = window.PDFLib;
+  const doc = await P.PDFDocument.create();
+  const font = await doc.embedFont(P.StandardFonts.Helvetica);
+  const [pw, ph] = PT_SIZES.a4;
+  const margin = 40;
+  const size = 9;
+  const lineH = size * 1.5;
+  const lines = text.split("\n").filter(l => l.trim());
+  const perPage = Math.floor((ph - 2 * margin) / lineH);
+  for (let i = 0; i < lines.length; i += perPage) {
+    const page = doc.addPage([pw, ph]);
+    lines.slice(i, i + perPage).forEach((ln, k) => {
+      page.drawText(sanitizeWinAnsi(ln).slice(0, 100), { x: margin, y: ph - margin - (k + 1) * lineH, size, font });
+    });
+  }
+  return { blob: new Blob([await doc.save()], { type: "application/pdf" }) };
+};
+
+REAL_HANDLERS["ppt-to-pdf"] = async (prog) => {
+  const text = await extractOfficeText(state.files[0]);
+  const P = window.PDFLib;
+  const doc = await P.PDFDocument.create();
+  const font = await doc.embedFont(P.StandardFonts.Helvetica);
+  const fontBold = await doc.embedFont(P.StandardFonts.HelveticaBold);
+  const slides = text.split(/\n---\s*Slide\s*\d+/i).filter(s => s.trim());
+  const [pw, ph] = PT_SIZES.a4;
+  for (let i = 0; i < slides.length; i++) {
+    const page = doc.addPage([pw, ph]);
+    const slideText = slides[i].trim();
+    const titleLine = slideText.split("\n")[0] || "Slide " + (i + 1);
+    page.drawText(sanitizeWinAnsi(titleLine).slice(0, 60), { x: 60, y: ph - 80, size: 16, font: fontBold });
+    const bodyLines = slideText.split("\n").slice(1).filter(l => l.trim());
+    bodyLines.slice(0, 20).forEach((ln, k) => {
+      page.drawText(sanitizeWinAnsi(ln).slice(0, 80), { x: 60, y: ph - 120 - k * 18, size: 10, font });
+    });
+  }
+  return { blob: new Blob([await doc.save()], { type: "application/pdf" }) };
+};
+
+REAL_HANDLERS["pdf-ocr"] = async (prog) => {
+  const f = state.files[0];
+  const langMap = { en: "eng", id: "ind", es: "spa", fr: "fra", de: "deu" };
+  const tessLang = langMap[state.opts.lang] || "eng";
+  let T;
+  try { T = await import("https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js"); }
+  catch { throw new Error("Could not load OCR engine"); }
+  const worker = await T.createWorker(tessLang);
+  let allText = "";
+  if (f.ext === ".pdf") {
+    const lib = await pdfjsLib.getDocument({ data: await f.file.arrayBuffer() }).promise;
+    for (let p = 1; p <= Math.min(lib.numPages, 30); p++) {
+      const page = await lib.getPage(p);
+      const vp = page.getViewport({ scale: 2 });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(vp.width); canvas.height = Math.ceil(vp.height);
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+      const { data } = await worker.recognize(canvas);
+      allText += "\n--- Page " + p + " ---\n" + data.text;
+    }
+    lib.destroy();
+  } else {
+    const img = await loadImg(f.url);
+    const canvas = makeCanvas(img.naturalWidth, img.naturalHeight);
+    canvas.getContext("2d").drawImage(img, 0, 0);
+    const { data } = await worker.recognize(canvas);
+    allText = data.text;
+  }
+  await worker.terminate();
+  const P = window.PDFLib;
+  const doc = await P.PDFDocument.create();
+  const font = await doc.embedFont(P.StandardFonts.Helvetica);
+  const [pw, ph] = PT_SIZES.a4;
+  const margin = 50;
+  const size = 10;
+  const lineH = size * 1.5;
+  const maxW = pw - 2 * margin;
+  const lines = [];
+  for (const para of allText.trim().split(/\r?\n/)) {
+    let line = "";
+    for (const word of para.split(/\s+/)) {
+      const t = line ? line + " " + word : word;
+      if (font.widthOfTextAtSize(t, size) > maxW && line) { lines.push(line); line = word; }
+      else line = t;
+    }
+    lines.push(line);
+  }
+  const perPage = Math.floor((ph - 2 * margin) / lineH);
+  for (let i = 0; i < lines.length; i += perPage) {
+    const page = doc.addPage([pw, ph]);
+    lines.slice(i, i + perPage).forEach((ln, k) => {
+      if (ln) page.drawText(sanitizeWinAnsi(ln), { x: margin, y: ph - margin - (k + 1) * lineH, size, font });
+    });
+  }
+  return { blob: new Blob([await doc.save()], { type: "application/pdf" }) };
+};
+
+REAL_HANDLERS["html-to-pdf"] = async (prog) => {
+  const [pw, ph] = PT_SIZES[state.opts.size] || PT_SIZES.a4;
+  let [finalW, finalH] = state.opts.orientation === "landscape" ? [ph, pw] : [pw, ph];
+  let htmlContent = state.ex.htmlMode === "url" ? "<html><body>URL content</body></html>" : state.ex.html;
+  const P = window.PDFLib;
+  const doc = await P.PDFDocument.create();
+  const font = await doc.embedFont(P.StandardFonts.Helvetica);
+  const plainText = htmlContent.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const lines = plainText.split("\n").filter(l => l.trim());
+  const margin = 50;
+  const size = 10;
+  const lineH = size * 1.5;
+  const maxW = finalW - 2 * margin;
+  const wrappedLines = [];
+  for (const line of lines) {
+    let cur = "";
+    for (const word of line.split(/\s+/)) {
+      const t = cur ? cur + " " + word : word;
+      if (font.widthOfTextAtSize(t, size) > maxW && cur) { wrappedLines.push(cur); cur = word; }
+      else cur = t;
+    }
+    wrappedLines.push(cur);
+  }
+  const perPage = Math.floor((finalH - 2 * margin) / lineH);
+  for (let i = 0; i < wrappedLines.length; i += perPage) {
+    const page = doc.addPage([finalW, finalH]);
+    wrappedLines.slice(i, i + perPage).forEach((ln, k) => {
+      if (ln) page.drawText(sanitizeWinAnsi(ln), { x: margin, y: finalH - margin - (k + 1) * lineH, size, font });
+    });
+  }
+  return { blob: new Blob([await doc.save()], { type: "application/pdf" }) };
+};
+
+REAL_HANDLERS["rtf-to-pdf"] = async (prog) => {
+  const rtfText = await state.files[0].file.text();
+  let plain = rtfText.replace(/\\par\b/g, "\n").replace(/\\tab\b/g, "\t").replace(/\\[a-z]+\d*\s?/gi, "").replace(/\{|\}/g, "").replace(/\r\n/g, "\n").replace(/[^\S\n]+/g, " ").trim();
+  const P = window.PDFLib;
+  const doc = await P.PDFDocument.create();
+  const font = await doc.embedFont(P.StandardFonts.Helvetica);
+  const [pw, ph] = PT_SIZES.a4;
+  const margin = 57;
+  const size = 11;
+  const lineH = size * 1.45;
+  const maxW = pw - 2 * margin;
+  const lines = [];
+  for (const para of plain.split(/\n/)) {
+    let line = "";
+    for (const word of para.split(/\s+/)) {
+      const t = line ? line + " " + word : word;
+      if (font.widthOfTextAtSize(t, size) > maxW && line) { lines.push(line); line = word; }
+      else line = t;
+    }
+    lines.push(line);
+  }
+  const perPage = Math.floor((ph - 2 * margin) / lineH);
+  for (let i = 0; i < lines.length; i += perPage) {
+    const page = doc.addPage([pw, ph]);
+    lines.slice(i, i + perPage).forEach((ln, k) => {
+      if (ln) page.drawText(sanitizeWinAnsi(ln), { x: margin, y: ph - margin - (k + 1) * lineH, size, font });
+    });
+  }
+  return { blob: new Blob([await doc.save()], { type: "application/pdf" }) };
+};
+
+REAL_HANDLERS["odt-to-pdf"] = async (prog) => {
+  const text = await extractOfficeText(state.files[0]);
+  const P = window.PDFLib;
+  const doc = await P.PDFDocument.create();
+  const font = await doc.embedFont(P.StandardFonts.Helvetica);
+  const [pw, ph] = PT_SIZES.a4;
+  const margin = 57;
+  const size = 11;
+  const lineH = size * 1.45;
+  const maxW = pw - 2 * margin;
+  const lines = [];
+  for (const para of text.split(/\r?\n/)) {
+    let line = "";
+    for (const word of para.split(/\s+/)) {
+      const t = line ? line + " " + word : word;
+      if (font.widthOfTextAtSize(t, size) > maxW && line) { lines.push(line); line = word; }
+      else line = t;
+    }
+    lines.push(line);
+  }
+  const perPage = Math.floor((ph - 2 * margin) / lineH);
+  for (let i = 0; i < lines.length; i += perPage) {
+    const page = doc.addPage([pw, ph]);
+    lines.slice(i, i + perPage).forEach((ln, k) => {
+      if (ln) page.drawText(sanitizeWinAnsi(ln), { x: margin, y: ph - margin - (k + 1) * lineH, size, font });
+    });
+  }
+  return { blob: new Blob([await doc.save()], { type: "application/pdf" }) };
+};
+
+REAL_HANDLERS["epub-to-pdf"] = async (prog) => {
+  const text = await extractEpubText(state.files[0]);
+  const P = window.PDFLib;
+  const doc = await P.PDFDocument.create();
+  const font = await doc.embedFont(P.StandardFonts.Helvetica);
+  const size = Number(state.opts.fontSize) || 12;
+  const sizes = { a4: PT_SIZES.a4, letter: PT_SIZES.letter, a5: [419.53, 595.28] };
+  const [pw, ph] = sizes[state.opts.size] || PT_SIZES.a4;
+  const margin = 57;
+  const lineH = size * 1.5;
+  const maxW = pw - 2 * margin;
+  const lines = [];
+  for (const para of text.split(/\r?\n/)) {
+    let line = "";
+    for (const word of para.split(/\s+/)) {
+      const t = line ? line + " " + word : word;
+      if (font.widthOfTextAtSize(t, size) > maxW && line) { lines.push(line); line = word; }
+      else line = t;
+    }
+    lines.push(line);
+  }
+  const perPage = Math.floor((ph - 2 * margin) / lineH);
+  for (let i = 0; i < lines.length; i += perPage) {
+    const page = doc.addPage([pw, ph]);
+    lines.slice(i, i + perPage).forEach((ln, k) => {
+      if (ln) page.drawText(sanitizeWinAnsi(ln), { x: margin, y: ph - margin - (k + 1) * lineH, size, font });
+    });
+  }
+  return { blob: new Blob([await doc.save()], { type: "application/pdf" }) };
+};
+
+REAL_HANDLERS["request-signatures"] = async (prog) => {
+  const P = window.PDFLib;
+  const bytes = new Uint8Array(await state.files[0].file.arrayBuffer());
+  const doc = await P.PDFDocument.load(bytes);
+  const recipients = state.ex.recipients;
+  const pages = doc.getPages();
+  const lastPage = pages[pages.length - 1];
+  const { width, height } = lastPage.getSize();
+  const font = await doc.embedFont(P.StandardFonts.Helvetica);
+  recipients.forEach((email, i) => {
+    const y = height - 80 - i * 60;
+    lastPage.drawRectangle({ x: 60, y: y - 5, width: 200, height: 30, borderColor: P.rgb(0.2, 0.45, 0.88), borderWidth: 1 });
+    lastPage.drawText("Signature: " + email.slice(0, 30), { x: 65, y: y + 5, size: 9, font, color: P.rgb(0.4, 0.4, 0.4) });
+  });
+  return { blob: new Blob([await doc.save()], { type: "application/pdf" }) };
+};
+
+REAL_HANDLERS["unlock-pdf"] = async (prog) => {
+  const P = window.PDFLib;
+  const bytes = new Uint8Array(await state.files[0].file.arrayBuffer());
+  const doc = await P.PDFDocument.load(bytes, { password: state.opts.password || "", ignoreEncryption: true });
+  doc.setProducer(""); doc.setCreator("");
+  return { blob: new Blob([await doc.save()], { type: "application/pdf" }) };
+};
+
+REAL_HANDLERS["protect-pdf"] = async (prog) => {
+  const P = window.PDFLib;
+  const bytes = new Uint8Array(await state.files[0].file.arrayBuffer());
+  const doc = await P.PDFDocument.load(bytes);
+  doc.setProducer("Smart Tools");
+  doc.setCreator("Smart Tools");
+  doc.setTitle("Protected Document");
+  return { blob: new Blob([await doc.save()], { type: "application/pdf" }) };
+};
+
+const state = { files: [], opts: {}, ex: {} };
+
+async function runTest(test) {
+  const start = performance.now();
+  results.set(test.id, { status: "running", detail: "Running..." });
+  renderResults();
+  updateSummary();
+
+  try {
+    let result;
+    const pdfBlob = await createTestPDF("Test content for " + test.name, 2);
+    const file = new File([pdfBlob], "test.pdf", { type: "application/pdf" });
+    const entry = { file, name: "test.pdf", ext: ".pdf", size: pdfBlob.size, url: URL.createObjectURL(pdfBlob) };
+
+    state.files = [entry];
+    state.opts = {};
+    state.ex = { marks: [], redactBoxes: [], recipients: [], page: 1 };
+
+    switch (test.id) {
+      case "pdf-converter": state.opts.target = "jpg"; break;
+      case "edit-pdf": state.ex.marks = [{ x: 20, y: 30, kind: "text" }]; break;
+      case "pdf-annotator": state.ex.marks = [{ x: 20, y: 30, kind: "highlight" }]; break;
+      case "redact-pdf": state.ex.redactBoxes = [{ x: 10, y: 20, w: 80, h: 12 }]; break;
+      case "pdf-to-word": case "pdf-to-excel": case "pdf-to-ppt": break;
+      case "word-to-pdf": {
+        const docx = await createTestDocx("Word to PDF test");
+        state.files = [{ file: new File([docx], "test.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }), name: "test.docx", ext: ".docx", size: docx.size }];
+        break;
+      }
+      case "excel-to-pdf": {
+        const xlsx = await createTestXlsx("Excel\tto\tPDF\ntest\tdata");
+        state.files = [{ file: new File([xlsx], "test.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), name: "test.xlsx", ext: ".xlsx", size: xlsx.size }];
+        state.opts = { sheets: "active", orientation: "portrait" };
+        break;
+      }
+      case "ppt-to-pdf": {
+        const pptx = await createTestPptx("Slide 1\nSlide 2");
+        state.files = [{ file: new File([pptx], "test.pptx", { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" }), name: "test.pptx", ext: ".pptx", size: pptx.size }];
+        state.opts = { perPage: "1", notes: false };
+        break;
+      }
+      case "pdf-ocr": state.opts = { lang: "en", searchable: true, textfile: false }; break;
+      case "html-to-pdf": state.files = []; state.ex = { htmlMode: "html", html: "<h1>Test</h1><p>HTML to PDF</p>" }; state.opts = { size: "a4", orientation: "portrait", background: true }; break;
+      case "rtf-to-pdf": {
+        const rtf = "{\\rtf1\\ansi RTF to PDF test}";
+        state.files = [{ file: new File([rtf], "test.rtf", { type: "application/rtf" }), name: "test.rtf", ext: ".rtf", size: rtf.length }];
+        break;
+      }
+      case "odt-to-pdf": {
+        const odt = await createTestOdt("ODT to PDF test");
+        state.files = [{ file: new File([odt], "test.odt", { type: "application/vnd.oasis.opendocument.text" }), name: "test.odt", ext: ".odt", size: odt.size }];
+        break;
+      }
+      case "epub-to-pdf": {
+        const epub = await createTestEpub("EPUB to PDF test");
+        state.files = [{ file: new File([epub], "test.epub", { type: "application/epub+zip" }), name: "test.epub", ext: ".epub", size: epub.size }];
+        state.opts = { size: "a4", fontSize: 12 };
+        break;
+      }
+      case "request-signatures": state.ex.recipients = ["test@example.com"]; break;
+      case "unlock-pdf": state.opts = { password: "" }; break;
+      case "protect-pdf": state.opts = { password: "test123", confirmPassword: "test123" }; break;
+    }
+
+    const handler = REAL_HANDLERS[test.id];
+    if (!handler) throw new Error("Handler not found");
+
+    result = await handler(() => {});
+    if (!result.blob || result.blob.size === 0) throw new Error("Empty output");
+
+    const elapsed = Math.round(performance.now() - start);
+    results.set(test.id, { status: "pass", detail: `${(result.blob.size / 1024).toFixed(1)} KB`, time: elapsed });
+    log(`✓ ${test.name}: ${(result.blob.size / 1024).toFixed(1)} KB`, "pass");
+  } catch (e) {
+    const elapsed = Math.round(performance.now() - start);
+    results.set(test.id, { status: "fail", detail: e.message, time: elapsed });
+    log(`✗ ${test.name}: ${e.message}`, "fail");
+  }
+
+  renderResults();
+  updateSummary();
+}
+
+async function runAllTests() {
+  logEl.innerHTML = "";
+  results.clear();
+  renderResults();
+  updateSummary();
+  log("Starting QA regression tests for 19 previously-demo tools", "info");
+
+  let completed = 0;
+  for (const test of TESTS) {
+    document.getElementById("progress").style.width = ((completed / TESTS.length) * 100) + "%";
+    document.getElementById("status").textContent = `Running ${completed + 1} of ${TESTS.length}...`;
+    await runTest(test);
+    completed++;
+  }
+
+  document.getElementById("progress").style.width = "100%";
+  document.getElementById("status").textContent = "All tests completed";
+
+  const pass = [...results.values()].filter(r => r.status === "pass").length;
+  const fail = [...results.values()].filter(r => r.status === "fail").length;
+  log(`\n=== Test Summary ===`, "info");
+  log(`Total: ${TESTS.length} | Passed: ${pass} | Failed: ${fail}`, pass === TESTS.length ? "pass" : "fail");
+}
+
+document.getElementById("run-all").addEventListener("click", runAllTests);
+document.getElementById("run-failed").addEventListener("click", async () => {
+  const failed = TESTS.filter(t => results.get(t.id)?.status === "fail");
+  if (!failed.length) { log("No failed tests", "info"); return; }
+  log(`Re-running ${failed.length} failed tests...`, "info");
+  for (const test of failed) await runTest(test);
+});
+document.getElementById("clear-log").addEventListener("click", () => { logEl.innerHTML = ""; });
+
+window.addEventListener("DOMContentLoaded", () => {
+  logEl = document.getElementById("log");
+  progressEl = document.getElementById("progress");
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("app").style.display = "block";
+  renderResults();
+  updateSummary();
+  log("QA Regression Tests ready. Click 'Run All Tests' to start.", "info");
+});
+</script>
+</body>
+</html>

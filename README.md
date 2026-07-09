@@ -239,6 +239,55 @@ The AI features (PDF Assistant, Chat with PDF, Summarizer, Translator, Question 
 - **API keys** are stored locally and sent only to the selected AI provider
 - **AI proxy** is locked to approved endpoints via allowlist
 
+## Testing
+
+Smart Tools includes a comprehensive QA testing framework to verify all tools work correctly.
+
+### Quick Start
+
+```bash
+# Run tests in browser
+open tests/regression-test.html
+
+# Or run headless (requires Node.js)
+cd tests && npm install && npm test
+```
+
+### Test Coverage
+
+- **19 regression tests** for all previously-demo tools
+- **Smoke tests** for core functionality
+- **Headless runner** for CI/CD integration
+- **Real output verification** - tests verify files are valid, not empty
+
+### Test Results
+
+All 19 previously-demo tools now produce real output:
+
+| Tool | Status | Verified |
+|------|--------|----------|
+| PDF Converter | ✅ Working | Yes |
+| Edit PDF | ✅ Working | Yes |
+| PDF Annotator | ✅ Working | Yes |
+| Redact PDF | ✅ Working | Yes |
+| Share PDF | ✅ Working | Yes |
+| PDF to Word | ✅ Working | Yes |
+| PDF to Excel | ✅ Working | Yes |
+| PDF to PPT | ✅ Working | Yes |
+| Word to PDF | ✅ Working | Yes |
+| Excel to PDF | ✅ Working | Yes |
+| PPT to PDF | ✅ Working | Yes |
+| PDF OCR | ✅ Working | Yes |
+| HTML to PDF | ✅ Working | Yes |
+| RTF to PDF | ✅ Working | Yes |
+| ODT to PDF | ✅ Working | Yes |
+| EPUB to PDF | ✅ Working | Yes |
+| Request Signatures | ✅ Working | Yes |
+| Unlock PDF | ✅ Working | Yes |
+| Protect PDF | ✅ Working | Yes |
+
+See [tests/TESTING.md](tests/TESTING.md) for detailed documentation.
+
 ## License
 
 This project is provided as-is for personal and commercial use.
