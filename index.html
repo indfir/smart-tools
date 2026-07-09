@@ -4352,36 +4352,30 @@ function createDocx(text) {
 async function createDocxFromImages(images) {
   const enc = new TextEncoder();
   
-  // Build document.xml with embedded images
   let bodyXml = "";
   images.forEach((imgData, i) => {
-    const imgId = "rId" + (i + 2); // rId1 is for styles
-    // A4 page width in EMUs: 595.28pt * 9525 = 5670042 EMU
-    // Page height: 841.89pt * 9525 = 8018992 EMU
-    // Image width: ~5400000 EMU (with margins)
-    // Image height: proportional (A4 aspect ratio ~1.414)
+    const imgId = "rId" + (i + 2);
     const imgWidth = 5400000;
     const imgHeight = Math.round(imgWidth * 1.414);
     
     bodyXml += '<w:p><w:pPr><w:jc w:val="center"/></w:pPr>';
     bodyXml += '<w:r><w:rPr/><w:drawing>';
-    bodyXml += '<wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">';
+    bodyXml += '<wp:inline distT="0" distB="0" distL="0" distR="0">';
     bodyXml += '<wp:extent cx="' + imgWidth + '" cy="' + imgHeight + '"/>';
     bodyXml += '<wp:docPr id="' + (i + 1) + '" name="Page ' + (i + 1) + '"/>';
-    bodyXml += '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">';
+    bodyXml += '<a:graphic>';
     bodyXml += '<a:graphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></a:graphicFramePr>';
     bodyXml += '<a:xfrm><a:off x="0" y="0"/><a:ext cx="' + imgWidth + '" cy="' + imgHeight + '"/></a:xfrm>';
     bodyXml += '<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">';
-    bodyXml += '<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">';
+    bodyXml += '<pic:pic>';
     bodyXml += '<pic:nvPicPr><pic:cNvPr id="' + (i + 1) + '" name="image' + (i + 1) + '.jpeg"/><pic:cNvPicPr/></pic:nvPicPr>';
-    bodyXml += '<pic:blipFill><a:blip r:embed="' + imgId + '" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>';
+    bodyXml += '<pic:blipFill><a:blip r:embed="' + imgId + '"/>';
     bodyXml += '<a:stretch><a:fillRect/></a:stretch></pic:blipFill>';
     bodyXml += '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + imgWidth + '" cy="' + imgHeight + '"/></a:xfrm></pic:spPr>';
     bodyXml += '</pic:pic></a:graphicData></a:graphic></wp:inline>';
     bodyXml += '</w:drawing></w:r></w:p>';
   });
   
-  // Build relationships for images
   let relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   relsXml += '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
   relsXml += '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>';
@@ -4395,7 +4389,6 @@ async function createDocxFromImages(images) {
   });
   docRelsXml += '</Relationships>';
   
-  // Build content types
   let contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   contentTypesXml += '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">';
   contentTypesXml += '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>';
@@ -4404,13 +4397,16 @@ async function createDocxFromImages(images) {
   contentTypesXml += '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>';
   contentTypesXml += '</Types>';
   
-  // Build document.xml
+  const docNs = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ' +
+    'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ' +
+    'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' +
+    'xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
+  
   const docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
-    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+    '<w:document ' + docNs + '>' +
     '<w:body>' + bodyXml + '</w:body></w:document>';
   
-  // Prepare files for ZIP
   const files = [
     { name: "[Content_Types].xml", data: enc.encode(contentTypesXml) },
     { name: "_rels/.rels", data: enc.encode(relsXml) },
@@ -4418,7 +4414,6 @@ async function createDocxFromImages(images) {
     { name: "word/_rels/document.xml.rels", data: enc.encode(docRelsXml) },
   ];
   
-  // Add image files
   images.forEach((imgData, i) => {
     files.push({ name: "word/media/image" + (i + 1) + ".jpeg", data: imgData });
   });
@@ -4457,46 +4452,54 @@ async function createPreserveLayoutDocx(pages) {
     const widthEmu = Math.round(page.widthPt * PT_TO_EMU);
     const heightEmu = Math.round(page.heightPt * PT_TO_EMU);
     
-    // Section properties for this page (size + zero margins)
+    // Section properties for this page
     const sectPr = '<w:sectPr>' +
       '<w:pgSz w:w="' + widthTwip + '" w:h="' + heightTwip + '"/>' +
       '<w:pgMar w:top="0" w:right="0" w:bottom="0" w:left="0" w:header="0" w:footer="0" w:gutter="0"/>' +
       '</w:sectPr>';
     
     // Paragraph with image filling the entire page
-    bodyXml += '<w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/></w:pPr>';
+    bodyXml += '<w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/>';
+    
+    // Section break for all pages except the last (last section goes at end of body)
+    if (i < pages.length - 1) {
+      bodyXml += sectPr;
+    }
+    
+    bodyXml += '</w:pPr>';
     bodyXml += '<w:r><w:drawing>';
-    bodyXml += '<wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">';
+    bodyXml += '<wp:inline distT="0" distB="0" distL="0" distR="0">';
     bodyXml += '<wp:extent cx="' + widthEmu + '" cy="' + heightEmu + '"/>';
     bodyXml += '<wp:docPr id="' + (i + 1) + '" name="Page ' + (i + 1) + '"/>';
-    bodyXml += '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">';
+    bodyXml += '<a:graphic>';
     bodyXml += '<a:graphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></a:graphicFramePr>';
     bodyXml += '<a:xfrm><a:off x="0" y="0"/><a:ext cx="' + widthEmu + '" cy="' + heightEmu + '"/></a:xfrm>';
     bodyXml += '<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">';
-    bodyXml += '<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">';
+    bodyXml += '<pic:pic>';
     bodyXml += '<pic:nvPicPr><pic:cNvPr id="' + (i + 1) + '" name="page' + (i + 1) + '.jpeg"/><pic:cNvPicPr/></pic:nvPicPr>';
-    bodyXml += '<pic:blipFill><a:blip r:embed="' + imgId + '" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>';
+    bodyXml += '<pic:blipFill><a:blip r:embed="' + imgId + '"/>';
     bodyXml += '<a:stretch><a:fillRect/></a:stretch></pic:blipFill>';
     bodyXml += '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + widthEmu + '" cy="' + heightEmu + '"/></a:xfrm></pic:spPr>';
     bodyXml += '</pic:pic></a:graphicData></a:graphic></wp:inline>';
     bodyXml += '</w:drawing></w:r></w:p>';
     
-    // Add section break (except for last page)
-    if (i < pages.length - 1) {
-      bodyXml += '<w:p><w:pPr>' + sectPr + '</w:pPr></w:p>';
-    }
-    
     docRelsEntries += '<Relationship Id="' + imgId + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image' + (i + 1) + '.jpeg"/>';
     mediaFiles.push({ name: "word/media/image" + (i + 1) + ".jpeg", data: page.imageData });
   });
   
-  // Final section properties (for last page)
+  // Final section properties (for last page) - direct child of w:body
   const lastPage = pages[pages.length - 1];
   const finalSectPr = '<w:sectPr>' +
     '<w:pgSz w:w="' + Math.round(lastPage.widthPt * PT_TO_TWIP) + '" w:h="' + Math.round(lastPage.heightPt * PT_TO_TWIP) + '"/>' +
     '<w:pgMar w:top="0" w:right="0" w:bottom="0" w:left="0" w:header="0" w:footer="0" w:gutter="0"/>' +
     '</w:sectPr>';
-  bodyXml += '<w:p><w:pPr>' + finalSectPr + '</w:pPr></w:p>';
+  
+  const docNs = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ' +
+    'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ' +
+    'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' +
+    'xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" ' +
+    'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"';
   
   const contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
@@ -4517,9 +4520,8 @@ async function createPreserveLayoutDocx(pages) {
     '</Relationships>';
   
   const docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
-    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-    '<w:body>' + bodyXml + '</w:body></w:document>';
+    '<w:document ' + docNs + '>' +
+    '<w:body>' + bodyXml + finalSectPr + '</w:body></w:document>';
   
   const files = [
     { name: "[Content_Types].xml", data: enc.encode(contentTypesXml) },
@@ -4653,7 +4655,7 @@ async function createOcrDocx(pages) {
   const mediaFiles = [];
   
   pages.forEach((page, i) => {
-    const imgId = "rId" + (i * 2 + 2);
+    const imgId = "rId" + (i + 2);
     const widthTwip = Math.round(page.widthPt * PT_TO_TWIP);
     const heightTwip = Math.round(page.heightPt * PT_TO_TWIP);
     const widthEmu = Math.round(page.widthPt * PT_TO_EMU);
@@ -4666,29 +4668,32 @@ async function createOcrDocx(pages) {
       '</w:sectPr>';
     
     // Paragraph with image (background)
-    bodyXml += '<w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/></w:pPr>';
+    bodyXml += '<w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/>';
+    
+    // Section break for all pages except the last
+    if (i < pages.length - 1) {
+      bodyXml += sectPr;
+    }
+    
+    bodyXml += '</w:pPr>';
     bodyXml += '<w:r><w:drawing>';
-    bodyXml += '<wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">';
+    bodyXml += '<wp:inline distT="0" distB="0" distL="0" distR="0">';
     bodyXml += '<wp:extent cx="' + widthEmu + '" cy="' + heightEmu + '"/>';
     bodyXml += '<wp:docPr id="' + (i + 1) + '" name="Page ' + (i + 1) + '"/>';
-    bodyXml += '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">';
+    bodyXml += '<a:graphic>';
     bodyXml += '<a:graphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></a:graphicFramePr>';
     bodyXml += '<a:xfrm><a:off x="0" y="0"/><a:ext cx="' + widthEmu + '" cy="' + heightEmu + '"/></a:xfrm>';
     bodyXml += '<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">';
-    bodyXml += '<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">';
+    bodyXml += '<pic:pic>';
     bodyXml += '<pic:nvPicPr><pic:cNvPr id="' + (i + 1) + '" name="page' + (i + 1) + '.jpeg"/><pic:cNvPicPr/></pic:nvPicPr>';
-    bodyXml += '<pic:blipFill><a:blip r:embed="' + imgId + '" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>';
+    bodyXml += '<pic:blipFill><a:blip r:embed="' + imgId + '"/>';
     bodyXml += '<a:stretch><a:fillRect/></a:stretch></pic:blipFill>';
     bodyXml += '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + widthEmu + '" cy="' + heightEmu + '"/></a:xfrm></pic:spPr>';
     bodyXml += '</pic:pic></a:graphicData></a:graphic></wp:inline>';
     bodyXml += '</w:drawing></w:r></w:p>';
     
     // Add invisible text overlay (searchable layer)
-    // Note: Word doesn't support true invisible overlaid text like PDF does,
-    // so we add the OCR text as hidden paragraphs after the image.
-    // The text is marked as hidden with w:vanish so it's searchable but not visible.
     if (page.ocrWords && page.ocrWords.length > 0) {
-      // Group words into lines for cleaner output
       const lines = [];
       let currentLine = [];
       let lastY = null;
@@ -4718,22 +4723,23 @@ async function createOcrDocx(pages) {
       }
     }
     
-    // Section break
-    if (i < pages.length - 1) {
-      bodyXml += '<w:p><w:pPr>' + sectPr + '</w:pPr></w:p>';
-    }
-    
     docRelsEntries += '<Relationship Id="' + imgId + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image' + (i + 1) + '.jpeg"/>';
     mediaFiles.push({ name: "word/media/image" + (i + 1) + ".jpeg", data: page.imageData });
   });
   
-  // Final section
+  // Final section properties - direct child of w:body
   const lastPage = pages[pages.length - 1];
   const finalSectPr = '<w:sectPr>' +
     '<w:pgSz w:w="' + Math.round(lastPage.widthPt * PT_TO_TWIP) + '" w:h="' + Math.round(lastPage.heightPt * PT_TO_TWIP) + '"/>' +
     '<w:pgMar w:top="0" w:right="0" w:bottom="0" w:left="0" w:header="0" w:footer="0" w:gutter="0"/>' +
     '</w:sectPr>';
-  bodyXml += '<w:p><w:pPr>' + finalSectPr + '</w:pPr></w:p>';
+  
+  const docNs = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ' +
+    'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ' +
+    'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' +
+    'xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" ' +
+    'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"';
   
   const contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
@@ -4754,9 +4760,8 @@ async function createOcrDocx(pages) {
     '</Relationships>';
   
   const docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
-    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-    '<w:body>' + bodyXml + '</w:body></w:document>';
+    '<w:document ' + docNs + '>' +
+    '<w:body>' + bodyXml + finalSectPr + '</w:body></w:document>';
   
   const files = [
     { name: "[Content_Types].xml", data: enc.encode(contentTypesXml) },
